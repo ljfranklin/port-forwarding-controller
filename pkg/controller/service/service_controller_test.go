@@ -7,7 +7,7 @@ import (
 	"github.com/ljfranklin/port-forwarding-controller/pkg/controller/service"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/controller/service/servicefakes"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,18 +23,18 @@ var c client.Client
 const timeout = time.Second * 5
 
 func TestReconcile(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
+	g := NewGomegaWithT(t)
 
 	fakePFR := &servicefakes.FakePortForwardingReconciler{}
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 	c = mgr.GetClient()
 
 	recFn, requests := SetupTestReconcile(service.NewReconciler(mgr, fakePFR))
-	g.Expect(service.AddWithReconciler(mgr, recFn)).NotTo(gomega.HaveOccurred())
+	g.Expect(service.AddWithReconciler(mgr, recFn)).NotTo(HaveOccurred())
 
 	stopMgr, mgrStopped := StartTestManager(mgr, g)
 
@@ -65,7 +65,7 @@ func TestReconcile(t *testing.T) {
 	if apierrors.IsInvalid(err) {
 		t.Fatalf("failed to create object, got an invalid object error: %v", err)
 	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 
 	expectedRequest := reconcile.Request{
@@ -74,10 +74,10 @@ func TestReconcile(t *testing.T) {
 			Namespace: "default",
 		},
 	}
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+	g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 
-	g.Expect(fakePFR.ReconcileCallCount()).To(gomega.Equal(1))
-	g.Expect(fakePFR.ReconcileArgsForCall(0)).To(gomega.Equal([]forwarding.Address{
+	g.Expect(fakePFR.ReconcileCallCount()).To(Equal(1))
+	g.Expect(fakePFR.ReconcileArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
 			Name: "some-svc",
 			Port: 80,

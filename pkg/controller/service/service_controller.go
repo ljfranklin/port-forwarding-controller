@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +24,6 @@ type PortForwardingReconciler interface {
 
 // Add creates a new Service Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this core.Add(mgr) to install this Controller
 func Add(mgr manager.Manager, pfr PortForwardingReconciler) error {
 	return add(mgr, NewReconciler(mgr, pfr))
 }
@@ -58,16 +56,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by Service - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &corev1.Service{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -83,8 +71,6 @@ type ReconcileService struct {
 
 // Reconcile reads that state of the cluster for a Service object and makes changes based on the state read
 // and what is in the Service.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the Service instance
@@ -100,15 +86,18 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	if instance.Spec.Type == "LoadBalancer" {
+		// r.log.Info("Service", "Name", instance.Name, "IP", instance.Spec.LoadBalancerIP, "Ports", ports, "NodePorts", nodePorts)
+		addresses := []forwarding.Address{}
 		for _, port := range instance.Spec.Ports {
-			// r.log.Info("Service", "Name", instance.Name, "IP", instance.Spec.LoadBalancerIP, "Ports", ports, "NodePorts", nodePorts)
-			r.pfr.Reconcile([]forwarding.Address{
-				{
-					Name: instance.Name,
-					Port: int(port.Port),
-					IP:   instance.Spec.LoadBalancerIP,
-				},
+			addresses = append(addresses, forwarding.Address{
+				Name: instance.Name,
+				Port: int(port.Port),
+				IP:   instance.Spec.LoadBalancerIP,
 			})
+		}
+		err = r.pfr.Reconcile(addresses)
+		if err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 
