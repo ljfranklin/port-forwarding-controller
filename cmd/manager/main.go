@@ -5,6 +5,7 @@ import (
 
 	"github.com/ljfranklin/port-forwarding-controller/pkg/apis"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/controller"
+	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/webhook"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -44,7 +45,9 @@ func main() {
 
 	// Setup all Controllers
 	log.Info("Setting up controller")
-	if err := controller.AddToManager(mgr); err != nil {
+	forwardingReconciler := forwarding.Reconciler{}
+
+	if err := controller.AddToManager(mgr, forwardingReconciler); err != nil {
 		log.Error(err, "unable to register controllers to the manager")
 		os.Exit(1)
 	}

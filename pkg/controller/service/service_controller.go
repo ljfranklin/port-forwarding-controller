@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 
+	"github.com/go-logr/logr"
+	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -12,24 +14,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
+//go:generate counterfeiter . PortForwardingReconciler
+type PortForwardingReconciler interface {
+	Reconcile([]forwarding.Address) error
+}
 
 // Add creates a new Service Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this core.Add(mgr) to install this Controller
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, pfr PortForwardingReconciler) error {
+	return add(mgr, NewReconciler(mgr, pfr))
 }
 
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileService{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func AddWithReconciler(mgr manager.Manager, r reconcile.Reconciler) error {
+	return add(mgr, r)
+}
+
+// NewReconciler returns a new reconcile.Reconciler
+func NewReconciler(mgr manager.Manager, pfr PortForwardingReconciler) reconcile.Reconciler {
+	return &ReconcileService{
+		Client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+		pfr:    pfr,
+		log:    logf.Log.WithName("service-controller"),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -65,6 +77,8 @@ var _ reconcile.Reconciler = &ReconcileService{}
 type ReconcileService struct {
 	client.Client
 	scheme *runtime.Scheme
+	pfr    PortForwardingReconciler
+	log    logr.Logger
 }
 
 // Reconcile reads that state of the cluster for a Service object and makes changes based on the state read
@@ -84,6 +98,18 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+	if instance.Spec.Type == "LoadBalancer" {
+		for _, port := range instance.Spec.Ports {
+			// r.log.Info("Service", "Name", instance.Name, "IP", instance.Spec.LoadBalancerIP, "Ports", ports, "NodePorts", nodePorts)
+			r.pfr.Reconcile([]forwarding.Address{
+				{
+					Name: instance.Name,
+					Port: int(port.Port),
+					IP:   instance.Spec.LoadBalancerIP,
+				},
+			})
+		}
 	}
 
 	return reconcile.Result{}, nil

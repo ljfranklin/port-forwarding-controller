@@ -13,20 +13,21 @@
   - if response is `meta.msg: api.err.LoginRequired` then client hits /api/login
   - store cookie in memory, attach to each request
 - For each svc:
-  - if it is of type LoadBalancer
+  - if it is of type LoadBalancer or NodePort
     - List existing rules in unifi, add rule if missing
       - Rule name should be `$DEPLOYMENT-$PORT`
-      - Use `LoadBalancer Ingress` field for forward IP
+      - Use `LoadBalancer Ingress` field for forward IP or `External IP` for NodePort
 - For each forwarding rule in list:
   - if rule is in form `$DEPLOYMENT-\d+`
     - delete rule if no longer needed
 - Potential config options:
   - `namespaces: []`, optional, defaults to watching all
-  - `require_annotation: false`, optional, if true requires `enable` annotation to opt in
 - Potential `annotations`:
+  - `port-forward.lylefranklin.com/ports: 80,443`, required
   - `port-forward.lylefranklin.com/limit: SOME_CIDR`, defaults to 0.0.0.0/0
-  - `port-forward.lylefranklin.com/enable: true`, only required if `require_annotation: true`
-  - `port-forward.lylefranklin.com/site: default`, defaults to `default` site
+  - `port-forward.lylefranklin.com/unifi_site: SOME_SITE`, defaults to `default` site
+- Docs
+  - When to use NodePort vs LoadBalancer
 
 ## API calls
 
