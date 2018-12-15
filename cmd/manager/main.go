@@ -55,6 +55,7 @@ func main() {
 	}
 	forwardingReconciler := forwarding.Reconciler{
 		RouterClient: routerClient,
+		RulePrefix:   os.Getenv("ROUTER_RULE_PREFIX"),
 		Logger:       log,
 	}
 

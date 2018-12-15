@@ -18,6 +18,7 @@ func TestReconcileWithNoExistingRules(t *testing.T) {
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
 		Logger:       fakeLogger,
 	}
 
@@ -33,7 +34,7 @@ func TestReconcileWithNoExistingRules(t *testing.T) {
 
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(1))
 	g.Expect(fakeRouter.CreateAddressArgsForCall(0)).To(Equal(forwarding.Address{
-		Name: "port-1",
+		Name: "test-port-1",
 		Port: 80,
 		IP:   "1.2.3.4",
 	}))
@@ -45,7 +46,7 @@ func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "test-port-1",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -54,6 +55,7 @@ func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
 		Logger:       fakeLogger,
 	}
 
@@ -70,6 +72,42 @@ func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(0))
 }
 
+func TestReconcileWithExtraRules(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{
+		{
+			Name: "test-port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+		{
+			Name: "non-matching-prefix-port-1",
+			Port: 443,
+			IP:   "5.6.7.8",
+		},
+	}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	desiredRules := []forwarding.Address{}
+	err := r.Reconcile(desiredRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(1))
+	g.Expect(fakeRouter.DeleteAddressArgsForCall(0)).To(Equal(forwarding.Address{
+		Name: "test-port-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+	}))
+}
+
 func TestReconcileWithListError(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -79,6 +117,7 @@ func TestReconcileWithListError(t *testing.T) {
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
 		Logger:       fakeLogger,
 	}
 
@@ -103,6 +142,7 @@ func TestReconcileWithCreateError(t *testing.T) {
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
 		Logger:       fakeLogger,
 	}
 

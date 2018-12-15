@@ -103,7 +103,7 @@ func TestReconcile(t *testing.T) {
 	g.Expect(fakePFR.ReconcileCallCount()).To(Equal(1))
 	g.Expect(fakePFR.ReconcileArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
-			Name: "some-svc",
+			Name: "default-some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},

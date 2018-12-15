@@ -282,3 +282,53 @@ func TestDeleteAddress(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(testServer.deleteCallCount).To(Equal(1))
 }
+
+func TestDeleteAddressThatDoesNotExist(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testServer := &testServer{t: t}
+	ts := httptest.NewTLSServer(testServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.DeleteAddress(forwarding.Address{
+		Name: "does-not-exist",
+		Port: 80,
+		IP:   "1.2.3.4",
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(testServer.deleteCallCount).To(Equal(0))
+}
+
+func TestDeleteAddAddressWithBadCode(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	badDelete := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	ts := httptest.NewTLSServer(&testServer{t: t, customDeleteHandler: badDelete})
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.DeleteAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+	})
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(err.Error()).To(ContainSubstring("500"))
+}

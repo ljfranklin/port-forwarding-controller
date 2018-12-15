@@ -19,6 +19,17 @@ type FakeRouterClient struct {
 	createAddressReturnsOnCall map[int]struct {
 		result1 error
 	}
+	DeleteAddressStub        func(forwarding.Address) error
+	deleteAddressMutex       sync.RWMutex
+	deleteAddressArgsForCall []struct {
+		arg1 forwarding.Address
+	}
+	deleteAddressReturns struct {
+		result1 error
+	}
+	deleteAddressReturnsOnCall map[int]struct {
+		result1 error
+	}
 	ListAddressesStub        func() ([]forwarding.Address, error)
 	listAddressesMutex       sync.RWMutex
 	listAddressesArgsForCall []struct {
@@ -95,6 +106,66 @@ func (fake *FakeRouterClient) CreateAddressReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeRouterClient) DeleteAddress(arg1 forwarding.Address) error {
+	fake.deleteAddressMutex.Lock()
+	ret, specificReturn := fake.deleteAddressReturnsOnCall[len(fake.deleteAddressArgsForCall)]
+	fake.deleteAddressArgsForCall = append(fake.deleteAddressArgsForCall, struct {
+		arg1 forwarding.Address
+	}{arg1})
+	fake.recordInvocation("DeleteAddress", []interface{}{arg1})
+	fake.deleteAddressMutex.Unlock()
+	if fake.DeleteAddressStub != nil {
+		return fake.DeleteAddressStub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.deleteAddressReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakeRouterClient) DeleteAddressCallCount() int {
+	fake.deleteAddressMutex.RLock()
+	defer fake.deleteAddressMutex.RUnlock()
+	return len(fake.deleteAddressArgsForCall)
+}
+
+func (fake *FakeRouterClient) DeleteAddressCalls(stub func(forwarding.Address) error) {
+	fake.deleteAddressMutex.Lock()
+	defer fake.deleteAddressMutex.Unlock()
+	fake.DeleteAddressStub = stub
+}
+
+func (fake *FakeRouterClient) DeleteAddressArgsForCall(i int) forwarding.Address {
+	fake.deleteAddressMutex.RLock()
+	defer fake.deleteAddressMutex.RUnlock()
+	argsForCall := fake.deleteAddressArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeRouterClient) DeleteAddressReturns(result1 error) {
+	fake.deleteAddressMutex.Lock()
+	defer fake.deleteAddressMutex.Unlock()
+	fake.DeleteAddressStub = nil
+	fake.deleteAddressReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeRouterClient) DeleteAddressReturnsOnCall(i int, result1 error) {
+	fake.deleteAddressMutex.Lock()
+	defer fake.deleteAddressMutex.Unlock()
+	fake.DeleteAddressStub = nil
+	if fake.deleteAddressReturnsOnCall == nil {
+		fake.deleteAddressReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteAddressReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeRouterClient) ListAddresses() ([]forwarding.Address, error) {
 	fake.listAddressesMutex.Lock()
 	ret, specificReturn := fake.listAddressesReturnsOnCall[len(fake.listAddressesArgsForCall)]
@@ -155,6 +226,8 @@ func (fake *FakeRouterClient) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.createAddressMutex.RLock()
 	defer fake.createAddressMutex.RUnlock()
+	fake.deleteAddressMutex.RLock()
+	defer fake.deleteAddressMutex.RUnlock()
 	fake.listAddressesMutex.RLock()
 	defer fake.listAddressesMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

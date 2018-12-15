@@ -25,3 +25,8 @@ spec:
               secretKeyRef:
                 name: router
                 key: password
+          - name: ROUTER_RULE_PREFIX
+            valueFrom:
+              secretKeyRef:
+                name: router
+                key: rule_prefix

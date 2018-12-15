@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
@@ -86,11 +87,10 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	if r.isAnnotatedLB(instance) {
-		// r.log.Info("Service", "Name", instance.Name, "IP", instance.Spec.LoadBalancerIP, "Ports", ports, "NodePorts", nodePorts)
 		addresses := []forwarding.Address{}
 		for _, port := range instance.Spec.Ports {
 			addresses = append(addresses, forwarding.Address{
-				Name: instance.Name,
+				Name: fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
 				Port: int(port.Port),
 				IP:   instance.Spec.LoadBalancerIP,
 			})

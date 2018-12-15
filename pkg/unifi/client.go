@@ -142,7 +142,7 @@ func (c Client) DeleteAddress(address forwarding.Address) error {
 	}
 
 	if matchingID == "" {
-		return nil // TODO
+		return nil
 	}
 
 	endpoint := fmt.Sprintf("%s/api/s/default/rest/portforward/%s", c.ControllerURL, matchingID)
@@ -156,7 +156,7 @@ func (c Client) DeleteAddress(address forwarding.Address) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return c.buildRespErr(resp) // TODO
+		return c.buildRespErr(resp)
 	}
 
 	return nil
