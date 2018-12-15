@@ -14,9 +14,11 @@ func TestReconcileWithNoExistingRules(t *testing.T) {
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		Logger:       fakeLogger,
 	}
 
 	desiredRules := []forwarding.Address{
@@ -48,9 +50,11 @@ func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 	}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		Logger:       fakeLogger,
 	}
 
 	desiredRules := []forwarding.Address{
@@ -71,9 +75,11 @@ func TestReconcileWithListError(t *testing.T) {
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns(nil, errors.New("some-error"))
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		Logger:       fakeLogger,
 	}
 
 	desiredRules := []forwarding.Address{
@@ -93,9 +99,11 @@ func TestReconcileWithCreateError(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{}, nil)
 	fakeRouter.CreateAddressReturns(errors.New("some-error"))
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
 
 	r := forwarding.Reconciler{
 		RouterClient: fakeRouter,
+		Logger:       fakeLogger,
 	}
 
 	desiredRules := []forwarding.Address{

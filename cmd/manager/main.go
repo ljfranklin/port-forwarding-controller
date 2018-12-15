@@ -1,11 +1,13 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/ljfranklin/port-forwarding-controller/pkg/apis"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/controller"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
+	"github.com/ljfranklin/port-forwarding-controller/pkg/unifi"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/webhook"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -45,7 +47,16 @@ func main() {
 
 	// Setup all Controllers
 	log.Info("Setting up controller")
-	forwardingReconciler := forwarding.Reconciler{}
+	routerClient := unifi.Client{
+		HTTPClient:    &http.Client{},
+		ControllerURL: os.Getenv("ROUTER_URL"),
+		Username:      os.Getenv("ROUTER_USERNAME"),
+		Password:      os.Getenv("ROUTER_PASSWORD"),
+	}
+	forwardingReconciler := forwarding.Reconciler{
+		RouterClient: routerClient,
+		Logger:       log,
+	}
 
 	if err := controller.AddToManager(mgr, forwardingReconciler); err != nil {
 		log.Error(err, "unable to register controllers to the manager")

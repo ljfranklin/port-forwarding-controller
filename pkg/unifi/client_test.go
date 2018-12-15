@@ -12,12 +12,16 @@ import (
 )
 
 type testServer struct {
-	t                  *testing.T
-	customLoginHandler http.Handler
-	customListHandler  http.Handler
+	t                     *testing.T
+	customLoginHandler    http.Handler
+	customListHandler     http.Handler
+	customCreateHandler   http.Handler
+	customDeleteHandler   http.Handler
+	lastCreateRequestBody []byte
+	deleteCallCount       int
 }
 
-func (s testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g := NewGomegaWithT(s.t)
 
 	switch r.URL.Path {
@@ -38,16 +42,18 @@ func (s testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		w.Write([]byte(`{"data": [] ,"meta": {"rc": "ok"}}`))
 	case "/api/s/default/rest/portforward":
-		if s.customListHandler != nil {
-			s.customListHandler.ServeHTTP(w, r)
-			return
-		}
+		switch r.Method {
+		case "GET":
+			if s.customListHandler != nil {
+				s.customListHandler.ServeHTTP(w, r)
+				return
+			}
 
-		c, err := r.Cookie("some-cookie")
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(c.Value).To(Equal("some-value"))
+			c, err := r.Cookie("some-cookie")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(c.Value).To(Equal("some-value"))
 
-		w.Write([]byte(`{
+			w.Write([]byte(`{
 				"data": [
 					{
 						"_id": "5bd919f20889ae0019309113",
@@ -76,6 +82,42 @@ func (s testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					"rc": "ok"
 				}
 			}`))
+		case "POST":
+			if s.customCreateHandler != nil {
+				s.customCreateHandler.ServeHTTP(w, r)
+				return
+			}
+
+			c, err := r.Cookie("some-cookie")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(c.Value).To(Equal("some-value"))
+
+			s.lastCreateRequestBody, err = ioutil.ReadAll(r.Body)
+			g.Expect(err).NotTo(HaveOccurred())
+			defer r.Body.Close()
+
+			w.Write([]byte(`{}`))
+		default:
+			s.t.Errorf("unexpected request method %s to %s", r.Method, r.URL.Path)
+		}
+	case "/api/s/default/rest/portforward/5bd919f20889ae0019309113":
+		switch r.Method {
+		case "DELETE":
+			if s.customDeleteHandler != nil {
+				s.customDeleteHandler.ServeHTTP(w, r)
+				return
+			}
+
+			c, err := r.Cookie("some-cookie")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(c.Value).To(Equal("some-value"))
+
+			s.deleteCallCount++
+
+			w.Write([]byte(`{}`))
+		default:
+			s.t.Errorf("unexpected request method %s to %s", r.Method, r.URL.Path)
+		}
 	default:
 		s.t.Errorf("unexpected request to %s", r.URL.Path)
 	}
@@ -84,7 +126,7 @@ func (s testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func TestListAddresses(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	ts := httptest.NewTLSServer(testServer{t: t})
+	ts := httptest.NewTLSServer(&testServer{t: t})
 	defer ts.Close()
 
 	testClient := ts.Client()
@@ -118,7 +160,7 @@ func TestBadLogin(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{ "data": [], "meta" : { "msg": "api.err.SomeError", "rc": "error"}}`))
 	})
-	ts := httptest.NewTLSServer(testServer{t: t, customLoginHandler: badLogin})
+	ts := httptest.NewTLSServer(&testServer{t: t, customLoginHandler: badLogin})
 	defer ts.Close()
 
 	testClient := ts.Client()
@@ -141,7 +183,7 @@ func TestListAddressesWithBadRespCode(t *testing.T) {
 	badList := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
-	ts := httptest.NewTLSServer(testServer{t: t, customListHandler: badList})
+	ts := httptest.NewTLSServer(&testServer{t: t, customListHandler: badList})
 	defer ts.Close()
 
 	testClient := ts.Client()
@@ -155,4 +197,88 @@ func TestListAddressesWithBadRespCode(t *testing.T) {
 	_, err := client.ListAddresses()
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("500"))
+}
+
+func TestCreateAddAddress(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeServer := &testServer{t: t}
+	ts := httptest.NewTLSServer(fakeServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.CreateAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(fakeServer.lastCreateRequestBody).To(MatchJSON(`
+	{
+		"dst_port":	"80",
+		"enabled":	true,
+		"fwd": "1.2.3.4",
+		"fwd_port": "80",
+		"name": "name-1",
+		"proto": "tcp_udp",
+		"src": "any"
+	}
+`))
+}
+
+func TestCreateAddAddressWithBadCode(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	badCreate := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	ts := httptest.NewTLSServer(&testServer{t: t, customCreateHandler: badCreate})
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.CreateAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+	})
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(err.Error()).To(ContainSubstring("500"))
+}
+
+func TestDeleteAddress(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testServer := &testServer{t: t}
+	ts := httptest.NewTLSServer(testServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.DeleteAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(testServer.deleteCallCount).To(Equal(1))
 }

@@ -23,7 +23,8 @@
 - Potential config options:
   - `namespaces: []`, optional, defaults to watching all
 - Potential `annotations`:
-  - `port-forward.lylefranklin.com/ports: 80,443`, required
+  - `port-forward.lylefranklin.com/enable: true`, required
+  - `port-forward.lylefranklin.com/ports: 80,443`, ?
   - `port-forward.lylefranklin.com/limit: SOME_CIDR`, defaults to 0.0.0.0/0
   - `port-forward.lylefranklin.com/unifi_site: SOME_SITE`, defaults to `default` site
 - Docs

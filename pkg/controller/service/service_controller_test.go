@@ -43,11 +43,32 @@ func TestReconcile(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
-	// Create the Service object and expect the Reconcile
+	createServiceAndWait := func(svc *corev1.Service) {
+		err := c.Create(context.TODO(), svc)
+		// The instance object may not be a valid object because it might be missing some required fields.
+		// Please modify the instance object by adding required fields and then remove the following if statement.
+		if apierrors.IsInvalid(err) {
+			t.Fatalf("failed to create object, got an invalid object error: %v", err)
+		}
+		g.Expect(err).NotTo(HaveOccurred())
+		defer c.Delete(context.TODO(), svc)
+
+		expectedRequest := reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      svc.Name,
+				Namespace: "default",
+			},
+		}
+		g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+	}
+
 	instance := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "some-svc",
 			Namespace: "default",
+			Annotations: map[string]string{
+				"port-forward.lylefranklin.com/enable": "true",
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:           "LoadBalancer",
@@ -59,22 +80,25 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	err = c.Create(context.TODO(), instance)
-	// The instance object may not be a valid object because it might be missing some required fields.
-	// Please modify the instance object by adding required fields and then remove the following if statement.
-	if apierrors.IsInvalid(err) {
-		t.Fatalf("failed to create object, got an invalid object error: %v", err)
-	}
-	g.Expect(err).NotTo(HaveOccurred())
-	defer c.Delete(context.TODO(), instance)
+	createServiceAndWait(instance)
 
-	expectedRequest := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "some-svc",
-			Namespace: "default",
+	nonAnnotatedInstance := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "some-ignored-svc",
+			Namespace:   "default",
+			Annotations: map[string]string{},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:           "LoadBalancer",
+			LoadBalancerIP: "5.6.7.8",
+			Ports: []corev1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
 		},
 	}
-	g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+	createServiceAndWait(nonAnnotatedInstance)
 
 	g.Expect(fakePFR.ReconcileCallCount()).To(Equal(1))
 	g.Expect(fakePFR.ReconcileArgsForCall(0)).To(Equal([]forwarding.Address{

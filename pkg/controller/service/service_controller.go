@@ -85,7 +85,7 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	if instance.Spec.Type == "LoadBalancer" {
+	if r.isAnnotatedLB(instance) {
 		// r.log.Info("Service", "Name", instance.Name, "IP", instance.Spec.LoadBalancerIP, "Ports", ports, "NodePorts", nodePorts)
 		addresses := []forwarding.Address{}
 		for _, port := range instance.Spec.Ports {
@@ -102,4 +102,17 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
+	if instance.Spec.Type != "LoadBalancer" {
+		return false
+	}
+
+	for key, value := range instance.ObjectMeta.Annotations {
+		if key == "port-forward.lylefranklin.com/enable" && value == "true" {
+			return true
+		}
+	}
+	return false
 }

@@ -24,6 +24,7 @@ resources:
 
 patches:
 - manager_image_patch.yaml
+- manager_env_patch.yaml
 
 vars:
 - name: WEBHOOK_SECRET_NAME
@@ -31,3 +32,7 @@ vars:
     kind: Secret
     name: webhook-server-secret
     apiVersion: v1
+
+secretGenerator:
+- name: router
+  envCommand: "cat ./secrets/router.env"

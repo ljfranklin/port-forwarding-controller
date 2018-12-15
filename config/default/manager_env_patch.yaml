@@ -1,0 +1,27 @@
+$patch: merge
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+          - name: ROUTER_URL
+            valueFrom:
+              secretKeyRef:
+                name: router
+                key: url
+          - name: ROUTER_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: router
+                key: username
+          - name: ROUTER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: router
+                key: password
