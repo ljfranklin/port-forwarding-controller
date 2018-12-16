@@ -89,15 +89,21 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 	if r.isAnnotatedLB(instance) {
 		addresses := []forwarding.Address{}
+		var targetIP string
+		if instance.Spec.Type == "LoadBalancer" {
+			targetIP = instance.Spec.LoadBalancerIP
+		} else {
+			targetIP = instance.Spec.ExternalIPs[0]
+		}
 		for _, port := range instance.Spec.Ports {
 			addresses = append(addresses, forwarding.Address{
 				Name: fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
 				Port: int(port.Port),
-				IP:   instance.Spec.LoadBalancerIP,
+				IP:   targetIP,
 			})
 		}
 
-		finalizerName := "finalizer.pfc.lylefranklin.com/v1"
+		finalizerName := "finalizer.port-forwarding.lylefranklin.com/v1"
 
 		if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 			err = r.pfr.CreateAddresses(addresses)
@@ -129,13 +135,11 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 }
 
 func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
-	if instance.Spec.Type != "LoadBalancer" {
-		return false
-	}
-
-	for key, value := range instance.ObjectMeta.Annotations {
-		if key == "port-forward.lylefranklin.com/enable" && value == "true" {
-			return true
+	if instance.Spec.Type == "LoadBalancer" || (instance.Spec.Type == "NodePort" && len(instance.Spec.ExternalIPs) > 0) {
+		for key, value := range instance.ObjectMeta.Annotations {
+			if key == "port-forward.lylefranklin.com/enable" && value == "true" {
+				return true
+			}
 		}
 	}
 	return false

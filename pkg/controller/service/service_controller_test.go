@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,56 +21,59 @@ var c client.Client
 
 const timeout = time.Second * 5
 
-func TestReconcile(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	fakePFR := &servicefakes.FakePortForwardingReconciler{}
-
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
-	// channel when it is finished.
+func startManager(g *GomegaWithT, pfr service.PortForwardingReconciler) (chan reconcile.Request, func()) {
 	mgr, err := manager.New(cfg, manager.Options{})
 	g.Expect(err).NotTo(HaveOccurred())
 	c = mgr.GetClient()
 
-	recFn, requests := SetupTestReconcile(service.NewReconciler(mgr, fakePFR))
+	reconciler := service.NewReconciler(mgr, pfr)
+	recFn, requests := SetupTestReconcile(reconciler)
 	g.Expect(service.AddWithReconciler(mgr, recFn)).NotTo(HaveOccurred())
 
 	stopMgr, mgrStopped := StartTestManager(mgr, g)
 
-	defer func() {
+	return requests, func() {
 		close(stopMgr)
 		mgrStopped.Wait()
-	}()
+	}
+}
 
-	createServiceAndWait := func(svc *corev1.Service) {
-		err := c.Create(context.TODO(), svc)
-		// The instance object may not be a valid object because it might be missing some required fields.
-		// Please modify the instance object by adding required fields and then remove the following if statement.
-		if apierrors.IsInvalid(err) {
-			t.Fatalf("failed to create object, got an invalid object error: %v", err)
-		}
-		g.Expect(err).NotTo(HaveOccurred())
+func createServiceAndWait(g *GomegaWithT, svc *corev1.Service, requests chan reconcile.Request) {
+	err := c.Create(context.TODO(), svc)
+	g.Expect(err).NotTo(HaveOccurred())
 
-		expectedRequest := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      svc.Name,
-				Namespace: "default",
-			},
-		}
+	expectedRequest := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      svc.Name,
+			Namespace: "default",
+		},
+	}
+	g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+	// annotated LBs get a finalizer added which will trigger an update
+	if len(svc.ObjectMeta.Annotations) > 0 {
 		g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 	}
-	deleteServiceAndWait := func(svc *corev1.Service) {
-		err := c.Delete(context.TODO(), svc)
-		g.Expect(err).NotTo(HaveOccurred())
+}
 
-		expectedRequest := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      svc.Name,
-				Namespace: "default",
-			},
-		}
-		g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+func deleteServiceAndWait(g *GomegaWithT, svc *corev1.Service, requests chan reconcile.Request) {
+	err := c.Delete(context.TODO(), svc)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	expectedRequest := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      svc.Name,
+			Namespace: "default",
+		},
 	}
+	g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+}
+
+func TestReconcileWithLoadBalancer(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
 
 	instance := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -91,8 +93,65 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	createServiceAndWait(instance)
+	createServiceAndWait(g, instance, requests)
 	defer c.Delete(context.TODO(), instance)
+
+	// Create may get called a second time after finalizer is added
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
+	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
+		{
+			Name: "default-some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}))
+}
+
+func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
+
+	instance := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "some-svc",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"port-forward.lylefranklin.com/enable": "true",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:        "NodePort",
+			ExternalIPs: []string{"1.2.3.4"},
+			Ports: []corev1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+	createServiceAndWait(g, instance, requests)
+	defer c.Delete(context.TODO(), instance)
+
+	// Create may get called a second time after finalizer is added
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
+	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
+		{
+			Name: "default-some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}))
+}
+
+func TestReconcileWithNoAnnotation(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
 
 	nonAnnotatedInstance := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -110,20 +169,40 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	createServiceAndWait(nonAnnotatedInstance)
-	defer c.Delete(context.TODO(), instance)
+	createServiceAndWait(g, nonAnnotatedInstance, requests)
+	defer c.Delete(context.TODO(), nonAnnotatedInstance)
 
-	// Create may get called a second time after finalizer is added
-	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
-	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
-		{
-			Name: "default-some-svc",
-			Port: 80,
-			IP:   "1.2.3.4",
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(Equal(0))
+}
+
+func TestReconcileWithDelete(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
+
+	instance := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "some-svc",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"port-forward.lylefranklin.com/enable": "true",
+			},
 		},
-	}))
+		Spec: corev1.ServiceSpec{
+			Type:           "LoadBalancer",
+			LoadBalancerIP: "1.2.3.4",
+			Ports: []corev1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+	createServiceAndWait(g, instance, requests)
 
-	deleteServiceAndWait(instance)
+	deleteServiceAndWait(g, instance, requests)
 
 	g.Expect(fakePFR.DeleteAddressesCallCount()).To(Equal(1))
 	g.Expect(fakePFR.DeleteAddressesArgsForCall(0)).To(Equal([]forwarding.Address{

@@ -20,8 +20,6 @@
 - For each forwarding rule in list:
   - if rule is in form `$DEPLOYMENT-\d+`
     - delete rule if no longer needed
-- Potential config options:
-  - `namespaces: []`, optional, defaults to watching all
 - Potential `annotations`:
   - `port-forward.lylefranklin.com/enable: true`, required
   - `port-forward.lylefranklin.com/ports: 80,443`, ?
