@@ -1,3 +1,16 @@
+## TODO
+
+[x] Handle updates properly
+    - e.g. keep name the same but change port
+[x] add port number to name
+    - avoid name collisions
+[ ] Docker stuff
+[ ] Deploy
+[ ] Reduce number of API calls
+    - e.g. try to make call, login if necessary
+[ ] `port-forward.lylefranklin.com/unifi_site: SOME_SITE`
+[ ] Add docs
+
 ## Workflow
 
 - install kubebuilder
@@ -22,8 +35,6 @@
     - delete rule if no longer needed
 - Potential `annotations`:
   - `port-forward.lylefranklin.com/enable: true`, required
-  - `port-forward.lylefranklin.com/ports: 80,443`, ?
-  - `port-forward.lylefranklin.com/limit: SOME_CIDR`, defaults to 0.0.0.0/0
   - `port-forward.lylefranklin.com/unifi_site: SOME_SITE`, defaults to `default` site
 - Docs
   - When to use NodePort vs LoadBalancer

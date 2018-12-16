@@ -24,7 +24,7 @@ func TestCreateAddressesWithNoExistingRules(t *testing.T) {
 
 	desiredRules := []forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -34,7 +34,7 @@ func TestCreateAddressesWithNoExistingRules(t *testing.T) {
 
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(1))
 	g.Expect(fakeRouter.CreateAddressArgsForCall(0)).To(Equal(forwarding.Address{
-		Name: "test-port-1",
+		Name: "test-some-svc-80",
 		Port: 80,
 		IP:   "1.2.3.4",
 	}))
@@ -46,7 +46,7 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-port-1",
+			Name: "test-some-svc-80",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -61,7 +61,7 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 
 	desiredRules := []forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -78,7 +78,7 @@ func TestDeleteAddresses(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-port-1",
+			Name: "test-some-svc-80",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -93,7 +93,7 @@ func TestDeleteAddresses(t *testing.T) {
 
 	extraRules := []forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -103,8 +103,73 @@ func TestDeleteAddresses(t *testing.T) {
 
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(1))
 	g.Expect(fakeRouter.DeleteAddressArgsForCall(0)).To(Equal(forwarding.Address{
-		Name: "test-port-1",
+		Name: "test-some-svc-80",
 		Port: 80,
+		IP:   "1.2.3.4",
+	}))
+}
+
+func TestCreateAddressesWithUpdatedRules(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{
+		{
+			Name: "test-some-svc-8080",
+			Port: 8080,
+			IP:   "5.6.7.8",
+		},
+		{
+			Name:        "test-some-svc-443",
+			Port:        443,
+			IP:          "1.2.3.4",
+			SourceRange: "10.0.0.0/16",
+		},
+	}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	desiredRules := []forwarding.Address{
+		{
+			Name: "some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+		{
+			Name: "some-svc",
+			Port: 443,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.CreateAddresses(desiredRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(2))
+	g.Expect(fakeRouter.DeleteAddressArgsForCall(0)).To(Equal(forwarding.Address{
+		Name: "test-some-svc-8080",
+		Port: 8080,
+		IP:   "5.6.7.8",
+	}))
+	g.Expect(fakeRouter.DeleteAddressArgsForCall(1)).To(Equal(forwarding.Address{
+		Name:        "test-some-svc-443",
+		Port:        443,
+		IP:          "1.2.3.4",
+		SourceRange: "10.0.0.0/16",
+	}))
+	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(2))
+	g.Expect(fakeRouter.CreateAddressArgsForCall(0)).To(Equal(forwarding.Address{
+		Name: "test-some-svc-80",
+		Port: 80,
+		IP:   "1.2.3.4",
+	}))
+	g.Expect(fakeRouter.CreateAddressArgsForCall(1)).To(Equal(forwarding.Address{
+		Name: "test-some-svc-443",
+		Port: 443,
 		IP:   "1.2.3.4",
 	}))
 }
@@ -124,7 +189,7 @@ func TestDeleteAddressesWithNoExistingRules(t *testing.T) {
 
 	extraRules := []forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -214,7 +279,7 @@ func TestDeleteAddressesWithDeleteError(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-port-1",
+			Name: "test-some-svc-80",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},
@@ -230,7 +295,7 @@ func TestDeleteAddressesWithDeleteError(t *testing.T) {
 
 	extraRules := []forwarding.Address{
 		{
-			Name: "port-1",
+			Name: "some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
 		},

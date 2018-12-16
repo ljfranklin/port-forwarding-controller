@@ -2,6 +2,7 @@ package forwarding
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Address struct {
@@ -37,6 +38,14 @@ func (r Reconciler) CreateAddresses(addresses []Address) error {
 	existingAddresses, err := r.RouterClient.ListAddresses()
 	if err != nil {
 		return err
+	}
+
+	staleAddresses := r.staleAddresses(addresses, existingAddresses)
+	for _, address := range staleAddresses {
+		r.Logger.Info("deleting stale port forwarding rule", "name", address.Name, "port", address.Port, "ip", address.IP)
+		if err := r.RouterClient.DeleteAddress(address); err != nil {
+			return err
+		}
 	}
 
 	missingAddresses := r.missingAddresses(addresses, existingAddresses)
@@ -76,6 +85,7 @@ func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Addre
 	missingAddresses := []Address{}
 
 	for _, address := range desiredAddresses {
+		address.Name = fmt.Sprintf("%s-%d", address.Name, address.Port)
 		alreadyExists := false
 		for _, a := range existingAddresses {
 			if address == a {
@@ -91,9 +101,29 @@ func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Addre
 	return missingAddresses
 }
 
+func (r Reconciler) staleAddresses(desiredAddresses, existingAddresses []Address) []Address {
+	staleAddresses := []Address{}
+
+	for _, address := range existingAddresses {
+		needsUpdated := false
+		for _, a := range desiredAddresses {
+			if strings.HasPrefix(address.Name, a.Name) && address != a {
+				needsUpdated = true
+				break
+			}
+		}
+		if needsUpdated {
+			staleAddresses = append(staleAddresses, address)
+		}
+	}
+
+	return staleAddresses
+}
+
 func (r Reconciler) addressesToDelete(removedAddresses, existingAddresses []Address) []Address {
 	addressesToDelete := []Address{}
 	for _, removedAddress := range removedAddresses {
+		removedAddress.Name = fmt.Sprintf("%s-%d", removedAddress.Name, removedAddress.Port)
 		for _, existingAddress := range existingAddresses {
 			if removedAddress == existingAddress {
 				addressesToDelete = append(addressesToDelete, removedAddress)
