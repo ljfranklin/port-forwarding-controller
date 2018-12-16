@@ -9,82 +9,158 @@ import (
 )
 
 type FakePortForwardingReconciler struct {
-	ReconcileStub        func([]forwarding.Address) error
-	reconcileMutex       sync.RWMutex
-	reconcileArgsForCall []struct {
+	CreateAddressesStub        func([]forwarding.Address) error
+	createAddressesMutex       sync.RWMutex
+	createAddressesArgsForCall []struct {
 		arg1 []forwarding.Address
 	}
-	reconcileReturns struct {
+	createAddressesReturns struct {
 		result1 error
 	}
-	reconcileReturnsOnCall map[int]struct {
+	createAddressesReturnsOnCall map[int]struct {
+		result1 error
+	}
+	DeleteAddressesStub        func([]forwarding.Address) error
+	deleteAddressesMutex       sync.RWMutex
+	deleteAddressesArgsForCall []struct {
+		arg1 []forwarding.Address
+	}
+	deleteAddressesReturns struct {
+		result1 error
+	}
+	deleteAddressesReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakePortForwardingReconciler) Reconcile(arg1 []forwarding.Address) error {
+func (fake *FakePortForwardingReconciler) CreateAddresses(arg1 []forwarding.Address) error {
 	var arg1Copy []forwarding.Address
 	if arg1 != nil {
 		arg1Copy = make([]forwarding.Address, len(arg1))
 		copy(arg1Copy, arg1)
 	}
-	fake.reconcileMutex.Lock()
-	ret, specificReturn := fake.reconcileReturnsOnCall[len(fake.reconcileArgsForCall)]
-	fake.reconcileArgsForCall = append(fake.reconcileArgsForCall, struct {
+	fake.createAddressesMutex.Lock()
+	ret, specificReturn := fake.createAddressesReturnsOnCall[len(fake.createAddressesArgsForCall)]
+	fake.createAddressesArgsForCall = append(fake.createAddressesArgsForCall, struct {
 		arg1 []forwarding.Address
 	}{arg1Copy})
-	fake.recordInvocation("Reconcile", []interface{}{arg1Copy})
-	fake.reconcileMutex.Unlock()
-	if fake.ReconcileStub != nil {
-		return fake.ReconcileStub(arg1)
+	fake.recordInvocation("CreateAddresses", []interface{}{arg1Copy})
+	fake.createAddressesMutex.Unlock()
+	if fake.CreateAddressesStub != nil {
+		return fake.CreateAddressesStub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.reconcileReturns
+	fakeReturns := fake.createAddressesReturns
 	return fakeReturns.result1
 }
 
-func (fake *FakePortForwardingReconciler) ReconcileCallCount() int {
-	fake.reconcileMutex.RLock()
-	defer fake.reconcileMutex.RUnlock()
-	return len(fake.reconcileArgsForCall)
+func (fake *FakePortForwardingReconciler) CreateAddressesCallCount() int {
+	fake.createAddressesMutex.RLock()
+	defer fake.createAddressesMutex.RUnlock()
+	return len(fake.createAddressesArgsForCall)
 }
 
-func (fake *FakePortForwardingReconciler) ReconcileCalls(stub func([]forwarding.Address) error) {
-	fake.reconcileMutex.Lock()
-	defer fake.reconcileMutex.Unlock()
-	fake.ReconcileStub = stub
+func (fake *FakePortForwardingReconciler) CreateAddressesCalls(stub func([]forwarding.Address) error) {
+	fake.createAddressesMutex.Lock()
+	defer fake.createAddressesMutex.Unlock()
+	fake.CreateAddressesStub = stub
 }
 
-func (fake *FakePortForwardingReconciler) ReconcileArgsForCall(i int) []forwarding.Address {
-	fake.reconcileMutex.RLock()
-	defer fake.reconcileMutex.RUnlock()
-	argsForCall := fake.reconcileArgsForCall[i]
+func (fake *FakePortForwardingReconciler) CreateAddressesArgsForCall(i int) []forwarding.Address {
+	fake.createAddressesMutex.RLock()
+	defer fake.createAddressesMutex.RUnlock()
+	argsForCall := fake.createAddressesArgsForCall[i]
 	return argsForCall.arg1
 }
 
-func (fake *FakePortForwardingReconciler) ReconcileReturns(result1 error) {
-	fake.reconcileMutex.Lock()
-	defer fake.reconcileMutex.Unlock()
-	fake.ReconcileStub = nil
-	fake.reconcileReturns = struct {
+func (fake *FakePortForwardingReconciler) CreateAddressesReturns(result1 error) {
+	fake.createAddressesMutex.Lock()
+	defer fake.createAddressesMutex.Unlock()
+	fake.CreateAddressesStub = nil
+	fake.createAddressesReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakePortForwardingReconciler) ReconcileReturnsOnCall(i int, result1 error) {
-	fake.reconcileMutex.Lock()
-	defer fake.reconcileMutex.Unlock()
-	fake.ReconcileStub = nil
-	if fake.reconcileReturnsOnCall == nil {
-		fake.reconcileReturnsOnCall = make(map[int]struct {
+func (fake *FakePortForwardingReconciler) CreateAddressesReturnsOnCall(i int, result1 error) {
+	fake.createAddressesMutex.Lock()
+	defer fake.createAddressesMutex.Unlock()
+	fake.CreateAddressesStub = nil
+	if fake.createAddressesReturnsOnCall == nil {
+		fake.createAddressesReturnsOnCall = make(map[int]struct {
 			result1 error
 		})
 	}
-	fake.reconcileReturnsOnCall[i] = struct {
+	fake.createAddressesReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddresses(arg1 []forwarding.Address) error {
+	var arg1Copy []forwarding.Address
+	if arg1 != nil {
+		arg1Copy = make([]forwarding.Address, len(arg1))
+		copy(arg1Copy, arg1)
+	}
+	fake.deleteAddressesMutex.Lock()
+	ret, specificReturn := fake.deleteAddressesReturnsOnCall[len(fake.deleteAddressesArgsForCall)]
+	fake.deleteAddressesArgsForCall = append(fake.deleteAddressesArgsForCall, struct {
+		arg1 []forwarding.Address
+	}{arg1Copy})
+	fake.recordInvocation("DeleteAddresses", []interface{}{arg1Copy})
+	fake.deleteAddressesMutex.Unlock()
+	if fake.DeleteAddressesStub != nil {
+		return fake.DeleteAddressesStub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.deleteAddressesReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddressesCallCount() int {
+	fake.deleteAddressesMutex.RLock()
+	defer fake.deleteAddressesMutex.RUnlock()
+	return len(fake.deleteAddressesArgsForCall)
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddressesCalls(stub func([]forwarding.Address) error) {
+	fake.deleteAddressesMutex.Lock()
+	defer fake.deleteAddressesMutex.Unlock()
+	fake.DeleteAddressesStub = stub
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddressesArgsForCall(i int) []forwarding.Address {
+	fake.deleteAddressesMutex.RLock()
+	defer fake.deleteAddressesMutex.RUnlock()
+	argsForCall := fake.deleteAddressesArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddressesReturns(result1 error) {
+	fake.deleteAddressesMutex.Lock()
+	defer fake.deleteAddressesMutex.Unlock()
+	fake.DeleteAddressesStub = nil
+	fake.deleteAddressesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePortForwardingReconciler) DeleteAddressesReturnsOnCall(i int, result1 error) {
+	fake.deleteAddressesMutex.Lock()
+	defer fake.deleteAddressesMutex.Unlock()
+	fake.DeleteAddressesStub = nil
+	if fake.deleteAddressesReturnsOnCall == nil {
+		fake.deleteAddressesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteAddressesReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -92,8 +168,10 @@ func (fake *FakePortForwardingReconciler) ReconcileReturnsOnCall(i int, result1 
 func (fake *FakePortForwardingReconciler) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.reconcileMutex.RLock()
-	defer fake.reconcileMutex.RUnlock()
+	fake.createAddressesMutex.RLock()
+	defer fake.createAddressesMutex.RUnlock()
+	fake.deleteAddressesMutex.RLock()
+	defer fake.deleteAddressesMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

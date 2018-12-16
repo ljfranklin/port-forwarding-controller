@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestReconcileWithNoExistingRules(t *testing.T) {
+func TestCreateAddressesWithNoExistingRules(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
@@ -29,7 +29,7 @@ func TestReconcileWithNoExistingRules(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 	}
-	err := r.Reconcile(desiredRules)
+	err := r.CreateAddresses(desiredRules)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(1))
@@ -40,7 +40,7 @@ func TestReconcileWithNoExistingRules(t *testing.T) {
 	}))
 }
 
-func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
+func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
@@ -66,13 +66,13 @@ func TestReconcileWithRulesAlreadyAdded(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 	}
-	err := r.Reconcile(desiredRules)
+	err := r.CreateAddresses(desiredRules)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(0))
 }
 
-func TestReconcileWithExtraRules(t *testing.T) {
+func TestDeleteAddresses(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
@@ -81,11 +81,6 @@ func TestReconcileWithExtraRules(t *testing.T) {
 			Name: "test-port-1",
 			Port: 80,
 			IP:   "1.2.3.4",
-		},
-		{
-			Name: "non-matching-prefix-port-1",
-			Port: 443,
-			IP:   "5.6.7.8",
 		},
 	}, nil)
 	fakeLogger := &forwardingfakes.FakeInfoLogger{}
@@ -96,8 +91,14 @@ func TestReconcileWithExtraRules(t *testing.T) {
 		Logger:       fakeLogger,
 	}
 
-	desiredRules := []forwarding.Address{}
-	err := r.Reconcile(desiredRules)
+	extraRules := []forwarding.Address{
+		{
+			Name: "port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.DeleteAddresses(extraRules)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(1))
@@ -108,7 +109,33 @@ func TestReconcileWithExtraRules(t *testing.T) {
 	}))
 }
 
-func TestReconcileWithListError(t *testing.T) {
+func TestDeleteAddressesWithNoExistingRules(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	extraRules := []forwarding.Address{
+		{
+			Name: "port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.DeleteAddresses(extraRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
+}
+
+func TestCreateAddressesWithListError(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
@@ -128,11 +155,11 @@ func TestReconcileWithListError(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 	}
-	err := r.Reconcile(desiredRules)
+	err := r.CreateAddresses(desiredRules)
 	g.Expect(err).To(MatchError("some-error"))
 }
 
-func TestReconcileWithCreateError(t *testing.T) {
+func TestCreateAddressesWithCreateError(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
@@ -153,6 +180,61 @@ func TestReconcileWithCreateError(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 	}
-	err := r.Reconcile(desiredRules)
+	err := r.CreateAddresses(desiredRules)
+	g.Expect(err).To(MatchError("some-error"))
+}
+
+func TestDeleteAddressesWithListError(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{}, errors.New("some-error"))
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	extraRules := []forwarding.Address{
+		{
+			Name: "port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.DeleteAddresses(extraRules)
+	g.Expect(err).To(MatchError("some-error"))
+}
+
+func TestDeleteAddressesWithDeleteError(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{
+		{
+			Name: "test-port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}, nil)
+	fakeRouter.DeleteAddressReturns(errors.New("some-error"))
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	extraRules := []forwarding.Address{
+		{
+			Name: "port-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.DeleteAddresses(extraRules)
 	g.Expect(err).To(MatchError("some-error"))
 }

@@ -2,7 +2,6 @@ package forwarding
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Address struct {
@@ -29,12 +28,9 @@ type Reconciler struct {
 	Logger       InfoLogger
 }
 
-// TODO: also remove extra rules that are not longer needed that
-// start with given RulePrefix
-
-func (r Reconciler) Reconcile(desiredAddresses []Address) error {
-	for i := range desiredAddresses {
-		desiredAddresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, desiredAddresses[i].Name)
+func (r Reconciler) CreateAddresses(addresses []Address) error {
+	for i := range addresses {
+		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
 	}
 
 	existingAddresses, err := r.RouterClient.ListAddresses()
@@ -42,10 +38,7 @@ func (r Reconciler) Reconcile(desiredAddresses []Address) error {
 		return err
 	}
 
-	missingAddresses, err := r.missingAddresses(desiredAddresses, existingAddresses)
-	if err != nil {
-		return err
-	}
+	missingAddresses := r.missingAddresses(addresses, existingAddresses)
 
 	for _, address := range missingAddresses {
 		r.Logger.Info("adding port forwarding rule", "name", address.Name, "port", address.Port, "ip", address.IP)
@@ -54,12 +47,22 @@ func (r Reconciler) Reconcile(desiredAddresses []Address) error {
 		}
 	}
 
-	extraAddresses, err := r.extraAddresses(desiredAddresses, existingAddresses)
+	return nil
+}
+
+func (r Reconciler) DeleteAddresses(addresses []Address) error {
+	for i := range addresses {
+		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
+	}
+
+	existingAddresses, err := r.RouterClient.ListAddresses()
 	if err != nil {
 		return err
 	}
 
-	for _, address := range extraAddresses {
+	addressesToDelete := r.addressesToDelete(addresses, existingAddresses)
+
+	for _, address := range addressesToDelete {
 		r.Logger.Info("deleting port forwarding rule", "name", address.Name, "port", address.Port, "ip", address.IP)
 		if err := r.RouterClient.DeleteAddress(address); err != nil {
 			return err
@@ -68,7 +71,7 @@ func (r Reconciler) Reconcile(desiredAddresses []Address) error {
 	return nil
 }
 
-func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Address) ([]Address, error) {
+func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Address) []Address {
 	missingAddresses := []Address{}
 
 	for _, address := range desiredAddresses {
@@ -84,27 +87,18 @@ func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Addre
 		}
 	}
 
-	return missingAddresses, nil
+	return missingAddresses
 }
 
-func (r Reconciler) extraAddresses(desiredAddresses, existingAddresses []Address) ([]Address, error) {
-	extraAddresses := []Address{}
-
-	for _, address := range existingAddresses {
-		if !strings.HasPrefix(address.Name, r.RulePrefix) {
-			continue
-		}
-		matchFound := false
-		for _, a := range desiredAddresses {
-			if address == a {
-				matchFound = true
-				break
+func (r Reconciler) addressesToDelete(removedAddresses, existingAddresses []Address) []Address {
+	addressesToDelete := []Address{}
+	for _, removedAddress := range removedAddresses {
+		for _, existingAddress := range existingAddresses {
+			if removedAddress == existingAddress {
+				addressesToDelete = append(addressesToDelete, removedAddress)
 			}
-		}
-		if !matchFound {
-			extraAddresses = append(extraAddresses, address)
 		}
 	}
 
-	return extraAddresses, nil
+	return addressesToDelete
 }

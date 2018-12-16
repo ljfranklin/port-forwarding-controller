@@ -20,7 +20,8 @@ import (
 
 //go:generate counterfeiter . PortForwardingReconciler
 type PortForwardingReconciler interface {
-	Reconcile([]forwarding.Address) error
+	CreateAddresses([]forwarding.Address) error
+	DeleteAddresses([]forwarding.Address) error
 }
 
 // Add creates a new Service Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -95,9 +96,32 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 				IP:   instance.Spec.LoadBalancerIP,
 			})
 		}
-		err = r.pfr.Reconcile(addresses)
-		if err != nil {
-			return reconcile.Result{}, err
+
+		finalizerName := "finalizer.pfc.lylefranklin.com/v1"
+
+		if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+			err = r.pfr.CreateAddresses(addresses)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+				instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+				if err = r.Update(context.Background(), instance); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
+		} else {
+			if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+				err = r.pfr.DeleteAddresses(addresses)
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+
+				instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+				if err = r.Update(context.Background(), instance); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
 		}
 	}
 
@@ -115,4 +139,23 @@ func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
 		}
 	}
 	return false
+}
+
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }

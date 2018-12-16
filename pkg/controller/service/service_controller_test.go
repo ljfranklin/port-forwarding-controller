@@ -51,7 +51,18 @@ func TestReconcile(t *testing.T) {
 			t.Fatalf("failed to create object, got an invalid object error: %v", err)
 		}
 		g.Expect(err).NotTo(HaveOccurred())
-		defer c.Delete(context.TODO(), svc)
+
+		expectedRequest := reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      svc.Name,
+				Namespace: "default",
+			},
+		}
+		g.Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+	}
+	deleteServiceAndWait := func(svc *corev1.Service) {
+		err := c.Delete(context.TODO(), svc)
+		g.Expect(err).NotTo(HaveOccurred())
 
 		expectedRequest := reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -81,6 +92,7 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 	createServiceAndWait(instance)
+	defer c.Delete(context.TODO(), instance)
 
 	nonAnnotatedInstance := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,9 +111,22 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 	createServiceAndWait(nonAnnotatedInstance)
+	defer c.Delete(context.TODO(), instance)
 
-	g.Expect(fakePFR.ReconcileCallCount()).To(Equal(1))
-	g.Expect(fakePFR.ReconcileArgsForCall(0)).To(Equal([]forwarding.Address{
+	// Create may get called a second time after finalizer is added
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
+	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
+		{
+			Name: "default-some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+	}))
+
+	deleteServiceAndWait(instance)
+
+	g.Expect(fakePFR.DeleteAddressesCallCount()).To(Equal(1))
+	g.Expect(fakePFR.DeleteAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
 			Name: "default-some-svc",
 			Port: 80,
