@@ -33,6 +33,7 @@ type listItem struct {
 	Name string `json:"name"`
 	Port string `json:"fwd_port"`
 	IP   string `json:"fwd"`
+	Src  string `json:"src"`
 }
 
 type createRequest struct {
@@ -61,10 +62,15 @@ func (c Client) ListAddresses() ([]forwarding.Address, error) {
 		if err != nil {
 			return nil, err
 		}
+		src := a.Src
+		if src == "any" {
+			src = ""
+		}
 		addresses = append(addresses, forwarding.Address{
-			Name: a.Name,
-			Port: p,
-			IP:   a.IP,
+			Name:        a.Name,
+			Port:        p,
+			IP:          a.IP,
+			SourceRange: src,
 		})
 	}
 
@@ -95,6 +101,10 @@ func (c Client) CreateAddress(address forwarding.Address) error {
 		return err
 	}
 
+	src := "any"
+	if address.SourceRange != "" {
+		src = address.SourceRange
+	}
 	reqBody, err := json.Marshal(createRequest{
 		Name:    address.Name,
 		Port:    fmt.Sprintf("%d", address.Port),
@@ -102,7 +112,7 @@ func (c Client) CreateAddress(address forwarding.Address) error {
 		DstPort: fmt.Sprintf("%d", address.Port),
 		Enabled: true,
 		Proto:   "tcp_udp",
-		Src:     "any",
+		Src:     src,
 	})
 	if err != nil {
 		return err

@@ -5,9 +5,10 @@ import (
 )
 
 type Address struct {
-	Name string
-	Port int
-	IP   string
+	Name        string
+	Port        int
+	IP          string
+	SourceRange string
 }
 
 //go:generate counterfeiter . RouterClient

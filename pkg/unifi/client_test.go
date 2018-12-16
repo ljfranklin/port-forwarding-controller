@@ -75,7 +75,7 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						"name": "name-2",
 						"proto": "tcp_udp",
 						"site_id": "5bd85ec40889ae0019308fbe",
-						"src": "any"
+						"src": "10.0.0.0/16"
 					}
 				],
 				"meta": {
@@ -146,9 +146,10 @@ func TestListAddresses(t *testing.T) {
 			IP:   "1.2.3.4",
 		},
 		{
-			Name: "name-2",
-			Port: 443,
-			IP:   "5.6.7.8",
+			Name:        "name-2",
+			Port:        443,
+			IP:          "5.6.7.8",
+			SourceRange: "10.0.0.0/16",
 		},
 	}))
 }
@@ -229,6 +230,41 @@ func TestCreateAddAddress(t *testing.T) {
 		"name": "name-1",
 		"proto": "tcp_udp",
 		"src": "any"
+	}
+`))
+}
+
+func TestCreateAddAddressWithSourceRange(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeServer := &testServer{t: t}
+	ts := httptest.NewTLSServer(fakeServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.CreateAddress(forwarding.Address{
+		Name:        "name-1",
+		Port:        80,
+		IP:          "1.2.3.4",
+		SourceRange: "10.0.0.0/16",
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(fakeServer.lastCreateRequestBody).To(MatchJSON(`
+	{
+		"dst_port":	"80",
+		"enabled":	true,
+		"fwd": "1.2.3.4",
+		"fwd_port": "80",
+		"name": "name-1",
+		"proto": "tcp_udp",
+		"src": "10.0.0.0/16"
 	}
 `))
 }

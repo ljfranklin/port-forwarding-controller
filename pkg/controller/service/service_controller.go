@@ -90,16 +90,21 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 	if r.isAnnotatedLB(instance) {
 		addresses := []forwarding.Address{}
 		var targetIP string
+		var sourceRange string
 		if instance.Spec.Type == "LoadBalancer" {
 			targetIP = instance.Spec.LoadBalancerIP
+			if len(instance.Spec.LoadBalancerSourceRanges) > 0 {
+				sourceRange = instance.Spec.LoadBalancerSourceRanges[0]
+			}
 		} else {
 			targetIP = instance.Spec.ExternalIPs[0]
 		}
 		for _, port := range instance.Spec.Ports {
 			addresses = append(addresses, forwarding.Address{
-				Name: fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
-				Port: int(port.Port),
-				IP:   targetIP,
+				Name:        fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
+				Port:        int(port.Port),
+				IP:          targetIP,
+				SourceRange: sourceRange,
 			})
 		}
 

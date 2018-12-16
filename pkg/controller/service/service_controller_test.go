@@ -107,6 +107,47 @@ func TestReconcileWithLoadBalancer(t *testing.T) {
 	}))
 }
 
+func TestReconcileWithLoadBalancerSourceRange(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
+
+	instance := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "some-svc",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"port-forward.lylefranklin.com/enable": "true",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                     "LoadBalancer",
+			LoadBalancerIP:           "1.2.3.4",
+			LoadBalancerSourceRanges: []string{"10.0.0.0/16"},
+			Ports: []corev1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+	createServiceAndWait(g, instance, requests)
+	defer c.Delete(context.TODO(), instance)
+
+	// Create may get called a second time after finalizer is added
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
+	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
+		{
+			Name:        "default-some-svc",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "10.0.0.0/16",
+		},
+	}))
+}
+
 func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
 	g := NewGomegaWithT(t)
 
