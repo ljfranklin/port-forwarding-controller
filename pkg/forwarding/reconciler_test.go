@@ -46,9 +46,10 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-some-svc-80",
-			Port: 80,
-			IP:   "1.2.3.4",
+			Name:        "test-some-svc-80",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
 		},
 	}, nil)
 	fakeLogger := &forwardingfakes.FakeInfoLogger{}
@@ -70,6 +71,7 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(0))
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
 }
 
 func TestDeleteAddresses(t *testing.T) {
@@ -78,9 +80,10 @@ func TestDeleteAddresses(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-some-svc-80",
-			Port: 80,
-			IP:   "1.2.3.4",
+			Name:        "test-some-svc-80",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
 		},
 	}, nil)
 	fakeLogger := &forwardingfakes.FakeInfoLogger{}
@@ -115,9 +118,10 @@ func TestCreateAddressesWithUpdatedRules(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-some-svc-8080",
-			Port: 8080,
-			IP:   "5.6.7.8",
+			Name:        "test-some-svc-8080",
+			Port:        8080,
+			IP:          "5.6.7.8",
+			SourceRange: "any",
 		},
 		{
 			Name:        "test-some-svc-443",
@@ -279,9 +283,10 @@ func TestDeleteAddressesWithDeleteError(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name: "test-some-svc-80",
-			Port: 80,
-			IP:   "1.2.3.4",
+			Name:        "test-some-svc-80",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
 		},
 	}, nil)
 	fakeRouter.DeleteAddressReturns(errors.New("some-error"))

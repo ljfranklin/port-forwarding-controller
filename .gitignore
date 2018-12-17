@@ -1,6 +1,13 @@
 /tmp/
 /secrets/
 
+# temp artifacts created on docker build
+/Dockerfile.amd64
+/Dockerfile.arm32v6
+/Dockerfile.arm64v8
+/*.tar.gz
+/qemu-*-static
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

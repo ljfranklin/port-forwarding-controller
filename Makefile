@@ -1,6 +1,6 @@
 
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= ljfranklin/port-forwarding-controller
+IMG_TAG ?= latest
 
 all: test manager
 
@@ -22,8 +22,11 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
+
+# Delete controller in the configured Kubernetes cluster in ~/.kube/config
+delete-deployment: manifests
+	kustomize build config/default | kubectl delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
@@ -42,11 +45,15 @@ generate:
 	go generate ./pkg/... ./cmd/...
 
 # Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+docker-build:
+	IMAGE=$(IMG) ./scripts/docker-build.sh
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	docker push $(IMG):amd64-$(IMG_TAG)
+	docker push $(IMG):arm32v6-$(IMG_TAG)
+	docker push $(IMG):arm64v8-$(IMG_TAG)
+	docker manifest create --amend $(IMG):$(IMG_TAG) $(IMG):amd64-$(IMG_TAG) $(IMG):arm32v6-$(IMG_TAG) $(IMG):arm64v8-$(IMG_TAG)
+	docker manifest annotate $(IMG):$(IMG_TAG) $(IMG):arm32v6-$(IMG_TAG) --os linux --arch arm
+	docker manifest annotate $(IMG):$(IMG_TAG) $(IMG):arm64v8-$(IMG_TAG) --os linux --arch arm64 --variant armv8
+	docker manifest push $(IMG):$(IMG_TAG)

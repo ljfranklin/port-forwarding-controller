@@ -1,4 +1,3 @@
-$patch: merge
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -9,24 +8,25 @@ spec:
     spec:
       containers:
       - name: manager
+        image: ljfranklin/port-forwarding-controller:latest
         env:
           - name: ROUTER_URL
             valueFrom:
               secretKeyRef:
                 name: router
-                key: url
+                key: ROUTER_URL
           - name: ROUTER_USERNAME
             valueFrom:
               secretKeyRef:
                 name: router
-                key: username
+                key: ROUTER_USERNAME
           - name: ROUTER_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: router
-                key: password
+                key: ROUTER_PASSWORD
           - name: ROUTER_RULE_PREFIX
             valueFrom:
               secretKeyRef:
                 name: router
-                key: rule_prefix
+                key: ROUTER_RULE_PREFIX

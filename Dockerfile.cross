@@ -8,10 +8,15 @@ COPY cmd/    cmd/
 COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/ljfranklin/port-forwarding-controller/cmd/manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=__GOARCH__ GOARM=__GOARM__ go build -a -o manager github.com/ljfranklin/port-forwarding-controller/cmd/manager
 
-# Copy the controller-manager into a thin image
-FROM ubuntu:latest
+FROM __BASEIMAGE_ARCH__/alpine:3.7
+
+__CROSS_COPY qemu-__QEMU_ARCH__-static /usr/bin/
+
+RUN apk --no-cache --update add ca-certificates
+
 WORKDIR /root/
 COPY --from=builder /go/src/github.com/ljfranklin/port-forwarding-controller/manager .
+
 ENTRYPOINT ["./manager"]

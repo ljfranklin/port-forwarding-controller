@@ -39,6 +39,11 @@ func (r Reconciler) CreateAddresses(addresses []Address) error {
 	if err != nil {
 		return err
 	}
+	for i := range existingAddresses {
+		if existingAddresses[i].SourceRange == "any" {
+			existingAddresses[i].SourceRange = ""
+		}
+	}
 
 	staleAddresses := r.staleAddresses(addresses, existingAddresses)
 	for _, address := range staleAddresses {
@@ -68,6 +73,11 @@ func (r Reconciler) DeleteAddresses(addresses []Address) error {
 	existingAddresses, err := r.RouterClient.ListAddresses()
 	if err != nil {
 		return err
+	}
+	for i := range existingAddresses {
+		if existingAddresses[i].SourceRange == "any" {
+			existingAddresses[i].SourceRange = ""
+		}
 	}
 
 	addressesToDelete := r.addressesToDelete(addresses, existingAddresses)
@@ -107,6 +117,7 @@ func (r Reconciler) staleAddresses(desiredAddresses, existingAddresses []Address
 	for _, address := range existingAddresses {
 		needsUpdated := false
 		for _, a := range desiredAddresses {
+			a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
 			if strings.HasPrefix(address.Name, a.Name) && address != a {
 				needsUpdated = true
 				break

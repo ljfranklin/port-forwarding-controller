@@ -4,12 +4,22 @@
     - e.g. keep name the same but change port
 [x] add port number to name
     - avoid name collisions
-[ ] Docker stuff
-[ ] Deploy
+[x] Docker stuff
+[x] Deploy
 [ ] Reduce number of API calls
     - e.g. try to make call, login if necessary
 [ ] `port-forward.lylefranklin.com/unifi_site: SOME_SITE`
+[ ] Make helm chart
+[ ] Add to ansible
 [ ] Add docs
+
+## Docker build
+
+- Enable experimental docker CLI commands
+  - add `"experimental": "enabled"` to `$HOME/.docker/config.json`
+- Register QEMU:
+  - `docker run --rm --privileged multiarch/qemu-user-static:register`
+  - if you skip this step you'll get `standard_init_linux.go:190: exec user process caused "exec format error"`
 
 ## Workflow
 
