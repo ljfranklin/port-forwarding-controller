@@ -74,6 +74,47 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
 }
 
+func TestCreateAddressesWithOptions(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	desiredRules := []forwarding.Address{
+		{
+			Name: "some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
+		},
+	}
+	err := r.CreateAddresses(desiredRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.ListAddressesCallCount()).To(Equal(1))
+	g.Expect(fakeRouter.ListAddressesArgsForCall(0)).To(Equal(map[string]string{
+		"unifi-site": "some-site",
+	}))
+	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(1))
+	g.Expect(fakeRouter.CreateAddressArgsForCall(0)).To(Equal(forwarding.Address{
+		Name: "test-some-svc-80",
+		Port: 80,
+		IP:   "1.2.3.4",
+		Options: map[string]string{
+			"unifi-site": "some-site",
+		},
+	}))
+}
+
 func TestDeleteAddresses(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -202,6 +243,57 @@ func TestDeleteAddressesWithNoExistingRules(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
+}
+
+func TestDeleteAddressesWithOptions(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{
+		{
+			Name:        "test-some-svc-80",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
+		},
+	}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	extraRules := []forwarding.Address{
+		{
+			Name: "some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
+		},
+	}
+	err := r.DeleteAddresses(extraRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.ListAddressesCallCount()).To(Equal(1))
+	g.Expect(fakeRouter.ListAddressesArgsForCall(0)).To(Equal(map[string]string{
+		"unifi-site": "some-site",
+	}))
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(1))
+	g.Expect(fakeRouter.DeleteAddressArgsForCall(0)).To(Equal(forwarding.Address{
+		Name: "test-some-svc-80",
+		Port: 80,
+		IP:   "1.2.3.4",
+		Options: map[string]string{
+			"unifi-site": "some-site",
+		},
+	}))
 }
 
 func TestCreateAddressesWithListError(t *testing.T) {

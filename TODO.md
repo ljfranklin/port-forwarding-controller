@@ -6,9 +6,10 @@
     - avoid name collisions
 [x] Docker stuff
 [x] Deploy
+[x] `port-forwarding.lylefranklin.com/unifi_site: SOME_SITE`
 [ ] Reduce number of API calls
     - e.g. try to make call, login if necessary
-[ ] `port-forward.lylefranklin.com/unifi_site: SOME_SITE`
+[ ] Refactor
 [ ] Make helm chart
 [ ] Add to ansible
 [ ] Add docs
@@ -44,8 +45,8 @@
   - if rule is in form `$DEPLOYMENT-\d+`
     - delete rule if no longer needed
 - Potential `annotations`:
-  - `port-forward.lylefranklin.com/enable: true`, required
-  - `port-forward.lylefranklin.com/unifi_site: SOME_SITE`, defaults to `default` site
+  - `port-forwarding.lylefranklin.com/enable: true`, required
+  - `port-forwarding.lylefranklin.com/unifi-site: SOME_SITE`, defaults to `default` site
 - Docs
   - When to use NodePort vs LoadBalancer
 

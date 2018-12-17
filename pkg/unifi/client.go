@@ -46,12 +46,12 @@ type createRequest struct {
 	Src     string `json:"src"`
 }
 
-func (c Client) ListAddresses() ([]forwarding.Address, error) {
+func (c Client) ListAddresses(options map[string]string) ([]forwarding.Address, error) {
 	if err := c.login(); err != nil {
 		return nil, err
 	}
 
-	listResp, err := c.list()
+	listResp, err := c.list(options)
 	if err != nil {
 		return nil, err
 	}
@@ -71,14 +71,15 @@ func (c Client) ListAddresses() ([]forwarding.Address, error) {
 			Port:        p,
 			IP:          a.IP,
 			SourceRange: src,
+			Options:     options,
 		})
 	}
 
 	return addresses, nil
 }
 
-func (c Client) list() (listResponse, error) {
-	endpoint := fmt.Sprintf("%s/api/s/default/rest/portforward", c.ControllerURL)
+func (c Client) list(options map[string]string) (listResponse, error) {
+	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward", c.ControllerURL, c.siteName(options))
 	resp, err := c.HTTPClient.Get(endpoint)
 	if err != nil {
 		return listResponse{}, err
@@ -94,6 +95,13 @@ func (c Client) list() (listResponse, error) {
 		return listResponse{}, err
 	}
 	return listResp, nil
+}
+
+func (c Client) siteName(options map[string]string) string {
+	if name, ok := options["unifi-site"]; ok {
+		return name
+	}
+	return "default"
 }
 
 func (c Client) CreateAddress(address forwarding.Address) error {
@@ -118,7 +126,7 @@ func (c Client) CreateAddress(address forwarding.Address) error {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("%s/api/s/default/rest/portforward", c.ControllerURL)
+	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward", c.ControllerURL, c.siteName(address.Options))
 	resp, err := c.HTTPClient.Post(endpoint, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		return err
@@ -136,7 +144,7 @@ func (c Client) DeleteAddress(address forwarding.Address) error {
 		return err
 	}
 
-	listResp, err := c.list()
+	listResp, err := c.list(address.Options)
 	if err != nil {
 		return err
 	}
@@ -155,7 +163,7 @@ func (c Client) DeleteAddress(address forwarding.Address) error {
 		return nil
 	}
 
-	endpoint := fmt.Sprintf("%s/api/s/default/rest/portforward/%s", c.ControllerURL, matchingID)
+	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward/%s", c.ControllerURL, c.siteName(address.Options), matchingID)
 	req, err := http.NewRequest("DELETE", endpoint, nil)
 	if err != nil {
 		return err

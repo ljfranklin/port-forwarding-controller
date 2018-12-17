@@ -2,6 +2,7 @@ package forwarding
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -10,11 +11,12 @@ type Address struct {
 	Port        int
 	IP          string
 	SourceRange string
+	Options     map[string]string
 }
 
 //go:generate counterfeiter . RouterClient
 type RouterClient interface {
-	ListAddresses() ([]Address, error)
+	ListAddresses(map[string]string) ([]Address, error)
 	CreateAddress(Address) error
 	DeleteAddress(Address) error
 }
@@ -35,7 +37,13 @@ func (r Reconciler) CreateAddresses(addresses []Address) error {
 		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
 	}
 
-	existingAddresses, err := r.RouterClient.ListAddresses()
+	options := map[string]string{}
+	if len(addresses) > 0 {
+		// assumes options are the same for each port
+		options = addresses[0].Options
+	}
+
+	existingAddresses, err := r.RouterClient.ListAddresses(options)
 	if err != nil {
 		return err
 	}
@@ -70,7 +78,13 @@ func (r Reconciler) DeleteAddresses(addresses []Address) error {
 		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
 	}
 
-	existingAddresses, err := r.RouterClient.ListAddresses()
+	options := map[string]string{}
+	if len(addresses) > 0 {
+		// assumes options are the same for each port
+		options = addresses[0].Options
+	}
+
+	existingAddresses, err := r.RouterClient.ListAddresses(options)
 	if err != nil {
 		return err
 	}
@@ -98,7 +112,7 @@ func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Addre
 		address.Name = fmt.Sprintf("%s-%d", address.Name, address.Port)
 		alreadyExists := false
 		for _, a := range existingAddresses {
-			if address == a {
+			if reflect.DeepEqual(address, a) {
 				alreadyExists = true
 				break
 			}
@@ -118,7 +132,7 @@ func (r Reconciler) staleAddresses(desiredAddresses, existingAddresses []Address
 		needsUpdated := false
 		for _, a := range desiredAddresses {
 			a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
-			if strings.HasPrefix(address.Name, a.Name) && address != a {
+			if strings.HasPrefix(address.Name, a.Name) && !reflect.DeepEqual(address, a) {
 				needsUpdated = true
 				break
 			}
@@ -136,7 +150,7 @@ func (r Reconciler) addressesToDelete(removedAddresses, existingAddresses []Addr
 	for _, removedAddress := range removedAddresses {
 		removedAddress.Name = fmt.Sprintf("%s-%d", removedAddress.Name, removedAddress.Port)
 		for _, existingAddress := range existingAddresses {
-			if removedAddress == existingAddress {
+			if reflect.DeepEqual(removedAddress, existingAddress) {
 				addressesToDelete = append(addressesToDelete, removedAddress)
 			}
 		}

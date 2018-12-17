@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/ljfranklin/port-forwarding-controller/pkg/forwarding"
@@ -17,6 +18,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+const AnnotationPrefix = "port-forwarding.lylefranklin.com"
 
 //go:generate counterfeiter . PortForwardingReconciler
 type PortForwardingReconciler interface {
@@ -99,16 +102,24 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		} else {
 			targetIP = instance.Spec.ExternalIPs[0]
 		}
+		options := map[string]string{}
+		for k, v := range instance.ObjectMeta.Annotations {
+			if strings.HasPrefix(k, AnnotationPrefix) && !strings.HasSuffix(k, "/enable") {
+				options[strings.TrimPrefix(k, fmt.Sprintf("%s/", AnnotationPrefix))] = v
+			}
+		}
+
 		for _, port := range instance.Spec.Ports {
 			addresses = append(addresses, forwarding.Address{
 				Name:        fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
 				Port:        int(port.Port),
 				IP:          targetIP,
 				SourceRange: sourceRange,
+				Options:     options,
 			})
 		}
 
-		finalizerName := "finalizer.port-forwarding.lylefranklin.com/v1"
+		finalizerName := fmt.Sprintf("finalizer.%s/v1", AnnotationPrefix)
 
 		if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 			err = r.pfr.CreateAddresses(addresses)
@@ -142,7 +153,7 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
 	if instance.Spec.Type == "LoadBalancer" || (instance.Spec.Type == "NodePort" && len(instance.Spec.ExternalIPs) > 0) {
 		for key, value := range instance.ObjectMeta.Annotations {
-			if key == "port-forward.lylefranklin.com/enable" && value == "true" {
+			if key == fmt.Sprintf("%s/enable", AnnotationPrefix) && value == "true" {
 				return true
 			}
 		}

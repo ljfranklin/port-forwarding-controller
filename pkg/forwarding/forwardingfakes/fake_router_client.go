@@ -30,9 +30,10 @@ type FakeRouterClient struct {
 	deleteAddressReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ListAddressesStub        func() ([]forwarding.Address, error)
+	ListAddressesStub        func(map[string]string) ([]forwarding.Address, error)
 	listAddressesMutex       sync.RWMutex
 	listAddressesArgsForCall []struct {
+		arg1 map[string]string
 	}
 	listAddressesReturns struct {
 		result1 []forwarding.Address
@@ -166,15 +167,16 @@ func (fake *FakeRouterClient) DeleteAddressReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeRouterClient) ListAddresses() ([]forwarding.Address, error) {
+func (fake *FakeRouterClient) ListAddresses(arg1 map[string]string) ([]forwarding.Address, error) {
 	fake.listAddressesMutex.Lock()
 	ret, specificReturn := fake.listAddressesReturnsOnCall[len(fake.listAddressesArgsForCall)]
 	fake.listAddressesArgsForCall = append(fake.listAddressesArgsForCall, struct {
-	}{})
-	fake.recordInvocation("ListAddresses", []interface{}{})
+		arg1 map[string]string
+	}{arg1})
+	fake.recordInvocation("ListAddresses", []interface{}{arg1})
 	fake.listAddressesMutex.Unlock()
 	if fake.ListAddressesStub != nil {
-		return fake.ListAddressesStub()
+		return fake.ListAddressesStub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -189,10 +191,17 @@ func (fake *FakeRouterClient) ListAddressesCallCount() int {
 	return len(fake.listAddressesArgsForCall)
 }
 
-func (fake *FakeRouterClient) ListAddressesCalls(stub func() ([]forwarding.Address, error)) {
+func (fake *FakeRouterClient) ListAddressesCalls(stub func(map[string]string) ([]forwarding.Address, error)) {
 	fake.listAddressesMutex.Lock()
 	defer fake.listAddressesMutex.Unlock()
 	fake.ListAddressesStub = stub
+}
+
+func (fake *FakeRouterClient) ListAddressesArgsForCall(i int) map[string]string {
+	fake.listAddressesMutex.RLock()
+	defer fake.listAddressesMutex.RUnlock()
+	argsForCall := fake.listAddressesArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeRouterClient) ListAddressesReturns(result1 []forwarding.Address, result2 error) {

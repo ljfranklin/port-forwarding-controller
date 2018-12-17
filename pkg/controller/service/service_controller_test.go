@@ -80,7 +80,7 @@ func TestReconcileWithLoadBalancer(t *testing.T) {
 			Name:      "some-svc",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"port-forward.lylefranklin.com/enable": "true",
+				"port-forwarding.lylefranklin.com/enable": "true",
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -100,9 +100,10 @@ func TestReconcileWithLoadBalancer(t *testing.T) {
 	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
 	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
-			Name: "default-some-svc",
-			Port: 80,
-			IP:   "1.2.3.4",
+			Name:    "default-some-svc",
+			Port:    80,
+			IP:      "1.2.3.4",
+			Options: map[string]string{},
 		},
 	}))
 }
@@ -119,7 +120,7 @@ func TestReconcileWithLoadBalancerSourceRange(t *testing.T) {
 			Name:      "some-svc",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"port-forward.lylefranklin.com/enable": "true",
+				"port-forwarding.lylefranklin.com/enable": "true",
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -144,6 +145,7 @@ func TestReconcileWithLoadBalancerSourceRange(t *testing.T) {
 			Port:        80,
 			IP:          "1.2.3.4",
 			SourceRange: "10.0.0.0/16",
+			Options:     map[string]string{},
 		},
 	}))
 }
@@ -160,7 +162,7 @@ func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
 			Name:      "some-svc",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"port-forward.lylefranklin.com/enable": "true",
+				"port-forwarding.lylefranklin.com/enable": "true",
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -180,9 +182,53 @@ func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
 	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
 	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
+			Name:    "default-some-svc",
+			Port:    80,
+			IP:      "1.2.3.4",
+			Options: map[string]string{},
+		},
+	}))
+}
+
+func TestReconcileWithOptionAnnotations(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakePFR := &servicefakes.FakePortForwardingReconciler{}
+	requests, shutdown := startManager(g, fakePFR)
+	defer shutdown()
+
+	instance := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "some-svc",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"port-forwarding.lylefranklin.com/enable":     "true",
+				"port-forwarding.lylefranklin.com/unifi-site": "some-site",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:           "LoadBalancer",
+			LoadBalancerIP: "1.2.3.4",
+			Ports: []corev1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+	createServiceAndWait(g, instance, requests)
+	defer c.Delete(context.TODO(), instance)
+
+	// Create may get called a second time after finalizer is added
+	g.Expect(fakePFR.CreateAddressesCallCount()).To(BeNumerically(">=", 1))
+	g.Expect(fakePFR.CreateAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
+		{
 			Name: "default-some-svc",
 			Port: 80,
 			IP:   "1.2.3.4",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
 		},
 	}))
 }
@@ -228,7 +274,7 @@ func TestReconcileWithDelete(t *testing.T) {
 			Name:      "some-svc",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"port-forward.lylefranklin.com/enable": "true",
+				"port-forwarding.lylefranklin.com/enable": "true",
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -248,9 +294,10 @@ func TestReconcileWithDelete(t *testing.T) {
 	g.Expect(fakePFR.DeleteAddressesCallCount()).To(Equal(1))
 	g.Expect(fakePFR.DeleteAddressesArgsForCall(0)).To(Equal([]forwarding.Address{
 		{
-			Name: "default-some-svc",
-			Port: 80,
-			IP:   "1.2.3.4",
+			Name:    "default-some-svc",
+			Port:    80,
+			IP:      "1.2.3.4",
+			Options: map[string]string{},
 		},
 	}))
 }

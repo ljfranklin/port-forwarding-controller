@@ -1,6 +1,7 @@
 package unifi_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 type testServer struct {
 	t                     *testing.T
+	siteName              string
 	customLoginHandler    http.Handler
 	customListHandler     http.Handler
 	customCreateHandler   http.Handler
@@ -23,6 +25,10 @@ type testServer struct {
 
 func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g := NewGomegaWithT(s.t)
+
+	if s.siteName == "" {
+		s.siteName = "default"
+	}
 
 	switch r.URL.Path {
 	case "/api/login":
@@ -41,7 +47,7 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Value: "some-value",
 		})
 		w.Write([]byte(`{"data": [] ,"meta": {"rc": "ok"}}`))
-	case "/api/s/default/rest/portforward":
+	case fmt.Sprintf("/api/s/%s/rest/portforward", s.siteName):
 		switch r.Method {
 		case "GET":
 			if s.customListHandler != nil {
@@ -100,7 +106,7 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			s.t.Errorf("unexpected request method %s to %s", r.Method, r.URL.Path)
 		}
-	case "/api/s/default/rest/portforward/5bd919f20889ae0019309113":
+	case fmt.Sprintf("/api/s/%s/rest/portforward/5bd919f20889ae0019309113", s.siteName):
 		switch r.Method {
 		case "DELETE":
 			if s.customDeleteHandler != nil {
@@ -137,7 +143,7 @@ func TestListAddresses(t *testing.T) {
 		Password:      "some-password",
 	}
 
-	addresses, err := client.ListAddresses()
+	addresses, err := client.ListAddresses(nil)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(addresses).To(Equal([]forwarding.Address{
 		{
@@ -150,6 +156,45 @@ func TestListAddresses(t *testing.T) {
 			Port:        443,
 			IP:          "5.6.7.8",
 			SourceRange: "10.0.0.0/16",
+		},
+	}))
+}
+
+func TestListAddressesWithUnifiSiteOption(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	ts := httptest.NewTLSServer(&testServer{t: t, siteName: "some-site"})
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	addresses, err := client.ListAddresses(map[string]string{
+		"unifi-site": "some-site",
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(addresses).To(Equal([]forwarding.Address{
+		{
+			Name: "name-1",
+			Port: 80,
+			IP:   "1.2.3.4",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
+		},
+		{
+			Name:        "name-2",
+			Port:        443,
+			IP:          "5.6.7.8",
+			SourceRange: "10.0.0.0/16",
+			Options: map[string]string{
+				"unifi-site": "some-site",
+			},
 		},
 	}))
 }
@@ -172,7 +217,7 @@ func TestBadLogin(t *testing.T) {
 		Password:      "some-password",
 	}
 
-	_, err := client.ListAddresses()
+	_, err := client.ListAddresses(nil)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("api.err.SomeError"))
 	g.Expect(err.Error()).To(ContainSubstring("401"))
@@ -195,7 +240,7 @@ func TestListAddressesWithBadRespCode(t *testing.T) {
 		Password:      "some-password",
 	}
 
-	_, err := client.ListAddresses()
+	_, err := client.ListAddresses(nil)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("500"))
 }
@@ -265,6 +310,43 @@ func TestCreateAddAddressWithSourceRange(t *testing.T) {
 		"name": "name-1",
 		"proto": "tcp_udp",
 		"src": "10.0.0.0/16"
+	}
+`))
+}
+
+func TestCreateAddAddressWithUnifiSiteOption(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeServer := &testServer{t: t, siteName: "some-site"}
+	ts := httptest.NewTLSServer(fakeServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.CreateAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+		Options: map[string]string{
+			"unifi-site": "some-site",
+		},
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(fakeServer.lastCreateRequestBody).To(MatchJSON(`
+	{
+		"dst_port":	"80",
+		"enabled":	true,
+		"fwd": "1.2.3.4",
+		"fwd_port": "80",
+		"name": "name-1",
+		"proto": "tcp_udp",
+		"src": "any"
 	}
 `))
 }
@@ -341,6 +423,33 @@ func TestDeleteAddressThatDoesNotExist(t *testing.T) {
 	})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(testServer.deleteCallCount).To(Equal(0))
+}
+
+func TestDeleteAddressWithUnifiSiteOption(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testServer := &testServer{t: t, siteName: "some-site"}
+	ts := httptest.NewTLSServer(testServer)
+	defer ts.Close()
+
+	testClient := ts.Client()
+	client := unifi.Client{
+		HTTPClient:    testClient,
+		ControllerURL: ts.URL,
+		Username:      "some-user",
+		Password:      "some-password",
+	}
+
+	err := client.DeleteAddress(forwarding.Address{
+		Name: "name-1",
+		Port: 80,
+		IP:   "1.2.3.4",
+		Options: map[string]string{
+			"unifi-site": "some-site",
+		},
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(testServer.deleteCallCount).To(Equal(1))
 }
 
 func TestDeleteAddAddressWithBadCode(t *testing.T) {
