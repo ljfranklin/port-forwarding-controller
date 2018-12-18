@@ -30,6 +30,14 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.siteName = "default"
 	}
 
+	if r.URL.Path != "/api/login" {
+		if _, err := r.Cookie("some-cookie"); err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"data": [] ,"meta": {"msg": "api.err.LoginRequired", "rc": "error"}}`))
+			return
+		}
+	}
+
 	switch r.URL.Path {
 	case "/api/login":
 		if s.customLoginHandler != nil {

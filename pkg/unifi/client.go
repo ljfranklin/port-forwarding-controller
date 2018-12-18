@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -18,6 +19,13 @@ type Client struct {
 	ControllerURL string
 	Username      string
 	Password      string
+}
+
+type baseResponse struct {
+	Meta meta `json:"meta"`
+}
+type meta struct {
+	Msg string `json:"msg"`
 }
 
 type loginRequest struct {
@@ -47,10 +55,6 @@ type createRequest struct {
 }
 
 func (c Client) ListAddresses(options map[string]string) ([]forwarding.Address, error) {
-	if err := c.login(); err != nil {
-		return nil, err
-	}
-
 	listResp, err := c.list(options)
 	if err != nil {
 		return nil, err
@@ -80,17 +84,13 @@ func (c Client) ListAddresses(options map[string]string) ([]forwarding.Address, 
 
 func (c Client) list(options map[string]string) (listResponse, error) {
 	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward", c.ControllerURL, c.siteName(options))
-	resp, err := c.HTTPClient.Get(endpoint)
+	respBody, err := c.makeAPICall("GET", endpoint, nil)
 	if err != nil {
 		return listResponse{}, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return listResponse{}, c.buildRespErr(resp)
-	}
 
 	var listResp listResponse
-	err = json.NewDecoder(resp.Body).Decode(&listResp)
+	err = json.Unmarshal(respBody, &listResp)
 	if err != nil {
 		return listResponse{}, err
 	}
@@ -105,10 +105,6 @@ func (c Client) siteName(options map[string]string) string {
 }
 
 func (c Client) CreateAddress(address forwarding.Address) error {
-	if err := c.login(); err != nil {
-		return err
-	}
-
 	src := "any"
 	if address.SourceRange != "" {
 		src = address.SourceRange
@@ -127,23 +123,15 @@ func (c Client) CreateAddress(address forwarding.Address) error {
 	}
 
 	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward", c.ControllerURL, c.siteName(address.Options))
-	resp, err := c.HTTPClient.Post(endpoint, "application/json", bytes.NewReader(reqBody))
-	if err != nil {
+	// TODO: do we need content-type?
+	if _, err := c.makeAPICall("POST", endpoint, reqBody); err != nil {
 		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return c.buildRespErr(resp)
 	}
 
 	return nil
 }
 
 func (c Client) DeleteAddress(address forwarding.Address) error {
-	if err := c.login(); err != nil {
-		return err
-	}
-
 	listResp, err := c.list(address.Options)
 	if err != nil {
 		return err
@@ -164,23 +152,54 @@ func (c Client) DeleteAddress(address forwarding.Address) error {
 	}
 
 	endpoint := fmt.Sprintf("%s/api/s/%s/rest/portforward/%s", c.ControllerURL, c.siteName(address.Options), matchingID)
-	req, err := http.NewRequest("DELETE", endpoint, nil)
+	_, err = c.makeAPICall("DELETE", endpoint, nil)
 	if err != nil {
 		return err
-	}
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return c.buildRespErr(resp)
 	}
 
 	return nil
 }
 
-// TODO: minimized number of login calls
+func (c Client) makeAPICall(method, endpoint string, body []byte) ([]byte, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, endpoint, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if c.isLoginError(resp) {
+		if err := c.login(); err != nil {
+			return nil, err
+		}
+		return c.makeAPICall(method, endpoint, body)
+	} else if resp.StatusCode >= 300 {
+		return nil, c.buildRespErr(resp)
+	}
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+func (c Client) isLoginError(resp *http.Response) bool {
+	if resp.StatusCode == 401 {
+		var decodedResp baseResponse
+		err := json.NewDecoder(resp.Body).Decode(&decodedResp)
+		if err != nil {
+			return false
+		}
+		if decodedResp.Meta.Msg == "api.err.LoginRequired" {
+			return true
+		}
+	}
+	return false
+}
+
 func (c Client) login() error {
 	if c.HTTPClient.Jar == nil {
 		jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})

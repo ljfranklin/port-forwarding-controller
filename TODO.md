@@ -7,7 +7,7 @@
 [x] Docker stuff
 [x] Deploy
 [x] `port-forwarding.lylefranklin.com/unifi_site: SOME_SITE`
-[ ] Reduce number of API calls
+[x] Reduce number of API calls
     - e.g. try to make call, login if necessary
 [ ] Refactor
 [ ] Make helm chart
