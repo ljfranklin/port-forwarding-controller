@@ -159,9 +159,9 @@ func TestCreateAddressesWithUpdatedRules(t *testing.T) {
 	fakeRouter := &forwardingfakes.FakeRouterClient{}
 	fakeRouter.ListAddressesReturns([]forwarding.Address{
 		{
-			Name:        "test-some-svc-8080",
-			Port:        8080,
-			IP:          "5.6.7.8",
+			Name:        "test-some-svc-9000",
+			Port:        9000,
+			IP:          "1.2.3.4",
 			SourceRange: "any",
 		},
 		{
@@ -196,9 +196,9 @@ func TestCreateAddressesWithUpdatedRules(t *testing.T) {
 
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(2))
 	g.Expect(fakeRouter.DeleteAddressArgsForCall(0)).To(Equal(forwarding.Address{
-		Name: "test-some-svc-8080",
-		Port: 8080,
-		IP:   "5.6.7.8",
+		Name: "test-some-svc-9000",
+		Port: 9000,
+		IP:   "1.2.3.4",
 	}))
 	g.Expect(fakeRouter.DeleteAddressArgsForCall(1)).To(Equal(forwarding.Address{
 		Name:        "test-some-svc-443",

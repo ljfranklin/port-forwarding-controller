@@ -49,13 +49,11 @@ func NewReconciler(mgr manager.Manager, pfr PortForwardingReconciler) reconcile.
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
 	c, err := controller.New("service-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to Service
 	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
@@ -90,67 +88,60 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	if r.isAnnotatedLB(instance) {
-		addresses := []forwarding.Address{}
-		var targetIP string
-		var sourceRange string
-		if instance.Spec.Type == "LoadBalancer" {
-			targetIP = instance.Spec.LoadBalancerIP
-			if len(instance.Spec.LoadBalancerSourceRanges) > 0 {
-				sourceRange = instance.Spec.LoadBalancerSourceRanges[0]
-			}
-		} else {
-			targetIP = instance.Spec.ExternalIPs[0]
-		}
-		options := map[string]string{}
-		for k, v := range instance.ObjectMeta.Annotations {
-			if strings.HasPrefix(k, AnnotationPrefix) && !strings.HasSuffix(k, "/enable") {
-				options[strings.TrimPrefix(k, fmt.Sprintf("%s/", AnnotationPrefix))] = v
-			}
-		}
 
-		for _, port := range instance.Spec.Ports {
-			addresses = append(addresses, forwarding.Address{
-				Name:        fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
-				Port:        int(port.Port),
-				IP:          targetIP,
-				SourceRange: sourceRange,
-				Options:     options,
-			})
-		}
-
-		finalizerName := fmt.Sprintf("finalizer.%s/v1", AnnotationPrefix)
-
-		if instance.ObjectMeta.DeletionTimestamp.IsZero() {
-			err = r.pfr.CreateAddresses(addresses)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-			if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-				instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
-				if err = r.Update(context.Background(), instance); err != nil {
-					return reconcile.Result{}, err
-				}
-			}
-		} else {
-			if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
-				err = r.pfr.DeleteAddresses(addresses)
-				if err != nil {
-					return reconcile.Result{}, err
-				}
-
-				instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
-				if err = r.Update(context.Background(), instance); err != nil {
-					return reconcile.Result{}, err
-				}
-			}
-		}
+	if isAnnotatedLB(instance) {
+		return r.processLB(instance)
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
+func (r *ReconcileService) processLB(instance *corev1.Service) (reconcile.Result, error) {
+	addresses := []forwarding.Address{}
+	targetIP := ipFromService(instance)
+	sourceRange := sourceRangeFromService(instance)
+	options := optionsFromService(instance)
+
+	for _, port := range instance.Spec.Ports {
+		addresses = append(addresses, forwarding.Address{
+			Name:        fmt.Sprintf("%s-%s", instance.ObjectMeta.Namespace, instance.Name),
+			Port:        int(port.Port),
+			IP:          targetIP,
+			SourceRange: sourceRange,
+			Options:     options,
+		})
+	}
+
+	finalizerName := fmt.Sprintf("finalizer.%s/v1", AnnotationPrefix)
+
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		err := r.pfr.CreateAddresses(addresses)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, finalizerName)
+			if err = r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	} else {
+		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			err := r.pfr.DeleteAddresses(addresses)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
+			if err = r.Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	}
+	return reconcile.Result{}, nil
+}
+
+func isAnnotatedLB(instance *corev1.Service) bool {
 	if instance.Spec.Type == "LoadBalancer" || (instance.Spec.Type == "NodePort" && len(instance.Spec.ExternalIPs) > 0) {
 		for key, value := range instance.ObjectMeta.Annotations {
 			if key == fmt.Sprintf("%s/enable", AnnotationPrefix) && value == "true" {
@@ -159,6 +150,31 @@ func (r *ReconcileService) isAnnotatedLB(instance *corev1.Service) bool {
 		}
 	}
 	return false
+}
+
+func ipFromService(svc *corev1.Service) string {
+	if svc.Spec.Type == "LoadBalancer" {
+		return svc.Spec.LoadBalancerIP
+	}
+	return svc.Spec.ExternalIPs[0]
+
+}
+
+func sourceRangeFromService(svc *corev1.Service) string {
+	if svc.Spec.Type == "LoadBalancer" && len(svc.Spec.LoadBalancerSourceRanges) > 0 {
+		return svc.Spec.LoadBalancerSourceRanges[0]
+	}
+	return ""
+}
+
+func optionsFromService(svc *corev1.Service) map[string]string {
+	options := map[string]string{}
+	for k, v := range svc.ObjectMeta.Annotations {
+		if strings.HasPrefix(k, AnnotationPrefix) && !strings.HasSuffix(k, "/enable") {
+			options[strings.TrimPrefix(k, fmt.Sprintf("%s/", AnnotationPrefix))] = v
+		}
+	}
+	return options
 }
 
 func containsString(slice []string, s string) bool {

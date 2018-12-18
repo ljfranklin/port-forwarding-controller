@@ -9,7 +9,7 @@
 [x] `port-forwarding.lylefranklin.com/unifi_site: SOME_SITE`
 [x] Reduce number of API calls
     - e.g. try to make call, login if necessary
-[ ] Refactor
+[x] Refactor
 [ ] Make helm chart
 [ ] Add to ansible
 [ ] Add docs

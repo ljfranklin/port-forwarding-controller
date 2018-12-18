@@ -33,24 +33,12 @@ type Reconciler struct {
 }
 
 func (r Reconciler) CreateAddresses(addresses []Address) error {
-	for i := range addresses {
-		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
-	}
+	addresses = r.addAddressPrefix(addresses)
+	options := r.getListOptions(addresses)
 
-	options := map[string]string{}
-	if len(addresses) > 0 {
-		// assumes options are the same for each port
-		options = addresses[0].Options
-	}
-
-	existingAddresses, err := r.RouterClient.ListAddresses(options)
+	existingAddresses, err := r.listExistingAddresses(options)
 	if err != nil {
 		return err
-	}
-	for i := range existingAddresses {
-		if existingAddresses[i].SourceRange == "any" {
-			existingAddresses[i].SourceRange = ""
-		}
 	}
 
 	staleAddresses := r.staleAddresses(addresses, existingAddresses)
@@ -62,7 +50,6 @@ func (r Reconciler) CreateAddresses(addresses []Address) error {
 	}
 
 	missingAddresses := r.missingAddresses(addresses, existingAddresses)
-
 	for _, address := range missingAddresses {
 		r.Logger.Info("adding port forwarding rule", "name", address.Name, "port", address.Port, "ip", address.IP)
 		if err := r.RouterClient.CreateAddress(address); err != nil {
@@ -74,28 +61,15 @@ func (r Reconciler) CreateAddresses(addresses []Address) error {
 }
 
 func (r Reconciler) DeleteAddresses(addresses []Address) error {
-	for i := range addresses {
-		addresses[i].Name = fmt.Sprintf("%s%s", r.RulePrefix, addresses[i].Name)
-	}
+	addresses = r.addAddressPrefix(addresses)
+	options := r.getListOptions(addresses)
 
-	options := map[string]string{}
-	if len(addresses) > 0 {
-		// assumes options are the same for each port
-		options = addresses[0].Options
-	}
-
-	existingAddresses, err := r.RouterClient.ListAddresses(options)
+	existingAddresses, err := r.listExistingAddresses(options)
 	if err != nil {
 		return err
 	}
-	for i := range existingAddresses {
-		if existingAddresses[i].SourceRange == "any" {
-			existingAddresses[i].SourceRange = ""
-		}
-	}
 
 	addressesToDelete := r.addressesToDelete(addresses, existingAddresses)
-
 	for _, address := range addressesToDelete {
 		r.Logger.Info("deleting port forwarding rule", "name", address.Name, "port", address.Port, "ip", address.IP)
 		if err := r.RouterClient.DeleteAddress(address); err != nil {
@@ -103,6 +77,37 @@ func (r Reconciler) DeleteAddresses(addresses []Address) error {
 		}
 	}
 	return nil
+}
+
+func (r Reconciler) addAddressPrefix(addresses []Address) []Address {
+	updated := make([]Address, len(addresses))
+	for i, addr := range addresses {
+		addr.Name = fmt.Sprintf("%s%s", r.RulePrefix, addr.Name)
+		updated[i] = addr
+	}
+	return updated
+}
+
+func (r Reconciler) getListOptions(addresses []Address) map[string]string {
+	options := map[string]string{}
+	if len(addresses) > 0 {
+		// assumes options are the same for each port
+		options = addresses[0].Options
+	}
+	return options
+}
+
+func (r Reconciler) listExistingAddresses(options map[string]string) ([]Address, error) {
+	existingAddresses, err := r.RouterClient.ListAddresses(options)
+	if err != nil {
+		return nil, err
+	}
+	for i := range existingAddresses {
+		if existingAddresses[i].SourceRange == "any" {
+			existingAddresses[i].SourceRange = ""
+		}
+	}
+	return existingAddresses, nil
 }
 
 func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Address) []Address {
@@ -129,16 +134,14 @@ func (r Reconciler) staleAddresses(desiredAddresses, existingAddresses []Address
 	staleAddresses := []Address{}
 
 	for _, address := range existingAddresses {
-		needsUpdated := false
 		for _, a := range desiredAddresses {
-			a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
-			if strings.HasPrefix(address.Name, a.Name) && !reflect.DeepEqual(address, a) {
-				needsUpdated = true
-				break
+			if strings.HasPrefix(address.Name, a.Name) {
+				a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
+				if !reflect.DeepEqual(address, a) {
+					staleAddresses = append(staleAddresses, address)
+					break
+				}
 			}
-		}
-		if needsUpdated {
-			staleAddresses = append(staleAddresses, address)
 		}
 	}
 
