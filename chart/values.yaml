@@ -1,0 +1,41 @@
+# Default values for port-forwarding.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ljfranklin/port-forwarding-controller
+  tag: latest
+  pullPolicy: IfNotPresent
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name:
+
+router:
+  createSecret: true
+  url:
+  username:
+  password:
+  rule_prefix: kube-
+
+nameOverride: ""
+fullnameOverride: ""
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 30Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 20Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
