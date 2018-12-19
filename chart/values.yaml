@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   repository: ljfranklin/port-forwarding-controller
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 rbac:
   create: true
