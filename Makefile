@@ -2,11 +2,15 @@
 IMG ?= ljfranklin/port-forwarding-controller
 IMG_TAG ?= latest
 
-all: test manager
+all: dev-setup test manager
+
+# Install deps
+dev-setup:
+	./scripts/dev-setup.sh
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS=$(shell pwd)/bin go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -22,11 +26,11 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	kustomize build config/default | kubectl apply -f -
+	./bin/kustomize build config/default | kubectl apply -f -
 
 # Delete controller in the configured Kubernetes cluster in ~/.kube/config
 delete-deployment: manifests
-	kustomize build config/default | kubectl delete -f -
+	./bin/kustomize build config/default | kubectl delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
