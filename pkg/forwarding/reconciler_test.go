@@ -74,6 +74,51 @@ func TestCreateAddressesWithRulesAlreadyAdded(t *testing.T) {
 	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
 }
 
+func TestCreateAddressesWithMultipleRulesAlreadyAdded(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeRouter := &forwardingfakes.FakeRouterClient{}
+	fakeRouter.ListAddressesReturns([]forwarding.Address{
+		{
+			Name:        "test-some-svc-80",
+			Port:        80,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
+		},
+		{
+			Name:        "test-some-svc-443",
+			Port:        443,
+			IP:          "1.2.3.4",
+			SourceRange: "any",
+		},
+	}, nil)
+	fakeLogger := &forwardingfakes.FakeInfoLogger{}
+
+	r := forwarding.Reconciler{
+		RouterClient: fakeRouter,
+		RulePrefix:   "test-",
+		Logger:       fakeLogger,
+	}
+
+	desiredRules := []forwarding.Address{
+		{
+			Name: "some-svc",
+			Port: 80,
+			IP:   "1.2.3.4",
+		},
+		{
+			Name: "some-svc",
+			Port: 443,
+			IP:   "1.2.3.4",
+		},
+	}
+	err := r.CreateAddresses(desiredRules)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(fakeRouter.CreateAddressCallCount()).To(Equal(0))
+	g.Expect(fakeRouter.DeleteAddressCallCount()).To(Equal(0))
+}
+
 func TestCreateAddressesWithOptions(t *testing.T) {
 	g := NewGomegaWithT(t)
 

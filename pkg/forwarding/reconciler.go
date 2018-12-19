@@ -133,14 +133,36 @@ func (r Reconciler) missingAddresses(desiredAddresses, existingAddresses []Addre
 func (r Reconciler) staleAddresses(desiredAddresses, existingAddresses []Address) []Address {
 	staleAddresses := []Address{}
 
+	// if existingAddresses exists which:
+	// - shares the same name prefix as a desiredAddress
+	// - but ports/src do not match any in desired addresses
+	// then delete as stale
+	desiredRulePrefixes := []string{}
+	for _, a := range desiredAddresses {
+		desiredRulePrefixes = append(desiredRulePrefixes, a.Name)
+	}
 	for _, address := range existingAddresses {
-		for _, a := range desiredAddresses {
-			if strings.HasPrefix(address.Name, a.Name) {
-				a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
-				if !reflect.DeepEqual(address, a) {
-					staleAddresses = append(staleAddresses, address)
-					break
+		matchesPrefix := false
+		for _, prefix := range desiredRulePrefixes {
+			if strings.HasPrefix(address.Name, prefix) {
+				matchesPrefix = true
+				break
+			}
+		}
+
+		if matchesPrefix {
+			foundMatch := false
+			for _, a := range desiredAddresses {
+				if strings.HasPrefix(address.Name, a.Name) {
+					a.Name = fmt.Sprintf("%s-%d", a.Name, a.Port)
+					if reflect.DeepEqual(address, a) {
+						foundMatch = true
+						break
+					}
 				}
+			}
+			if !foundMatch {
+				staleAddresses = append(staleAddresses, address)
 			}
 		}
 	}
