@@ -1,7 +1,7 @@
 ## Port Forwarding Controller
 
 A Kubernetes (k8s) controller which watches for new annotated Services and
-automatically a corresponding port forwarding rule to your router.
+automatically creates a corresponding port forwarding rule to your router.
 
 Currently Unifi routers are the only supported router model.
 
