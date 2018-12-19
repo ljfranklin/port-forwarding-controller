@@ -150,7 +150,7 @@ func TestReconcileWithLoadBalancerSourceRange(t *testing.T) {
 	}))
 }
 
-func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
+func TestReconcileWithExternalIP(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakePFR := &servicefakes.FakePortForwardingReconciler{}
@@ -166,7 +166,7 @@ func TestReconcileWithNodePortAndExternalIP(t *testing.T) {
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Type:        "NodePort",
+			Type:        "ClusterIP",
 			ExternalIPs: []string{"1.2.3.4"},
 			Ports: []corev1.ServicePort{
 				{

@@ -142,7 +142,7 @@ func (r *ReconcileService) processLB(instance *corev1.Service) (reconcile.Result
 }
 
 func isAnnotatedLB(instance *corev1.Service) bool {
-	if instance.Spec.Type == "LoadBalancer" || (instance.Spec.Type == "NodePort" && len(instance.Spec.ExternalIPs) > 0) {
+	if instance.Spec.Type == "LoadBalancer" || len(instance.Spec.ExternalIPs) > 0 {
 		for key, value := range instance.ObjectMeta.Annotations {
 			if key == fmt.Sprintf("%s/enable", AnnotationPrefix) && value == "true" {
 				return true
@@ -157,7 +157,6 @@ func ipFromService(svc *corev1.Service) string {
 		return svc.Spec.LoadBalancerIP
 	}
 	return svc.Spec.ExternalIPs[0]
-
 }
 
 func sourceRangeFromService(svc *corev1.Service) string {
