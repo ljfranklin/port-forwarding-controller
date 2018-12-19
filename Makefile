@@ -56,4 +56,4 @@ docker-push:
 	docker manifest create --amend $(IMG):$(IMG_TAG) $(IMG):amd64-$(IMG_TAG) $(IMG):arm32v6-$(IMG_TAG) $(IMG):arm64v8-$(IMG_TAG)
 	docker manifest annotate $(IMG):$(IMG_TAG) $(IMG):arm32v6-$(IMG_TAG) --os linux --arch arm
 	docker manifest annotate $(IMG):$(IMG_TAG) $(IMG):arm64v8-$(IMG_TAG) --os linux --arch arm64 --variant armv8
-	docker manifest push $(IMG):$(IMG_TAG)
+	docker manifest push --purge $(IMG):$(IMG_TAG)
