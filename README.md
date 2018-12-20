@@ -1,7 +1,7 @@
 ## Port Forwarding Controller
 
 A Kubernetes (k8s) controller which watches for new annotated Services and
-automatically creates a corresponding port forwarding rule to your router.
+automatically creates a corresponding port forwarding rule on your router.
 
 Currently Unifi routers are the only supported router model.
 
@@ -20,7 +20,7 @@ port-forwarding.lylefranklin.com/enable: "true"
 ```
 
 The port-forwarding-controller will notice this new annotated Service and add
-a port forwarding rule to your router to forward traffic on the given ports to
+a port forwarding rule on your router to forward traffic on the given ports to
 the IP of the new Service.
 
 #### Supported Service types
@@ -31,10 +31,10 @@ Services must be [annotated](https://kubernetes.io/docs/concepts/overview/workin
 with `port-forwarding.lylefranklin.com/enable: "true"` for the controller to
 manage forwarding rules for that Service.
 
-###### Load Balancer Service
+##### LoadBalancer Service
 
 Pros:
-- Traffic is balanced across multiple pod replicas
+- Traffic is balanced across multiple workers
 
 Cons:
 - Requires setting up a bare metal Load Balancer, e.g. [MetalLB](https://metallb.universe.tf/concepts/)
@@ -53,18 +53,17 @@ Explanation:
 The MetalLB [Concepts page](https://metallb.universe.tf/concepts/bgp/) does a good job
 explaining the underlying BGP concepts and the limitations of it.
 
-###### ClusterIP Service with ExternalIP
+##### ClusterIP Service with ExternalIP
 
 Pros:
 - Minimal additional setup
 
 Cons:
-- All traffic goes to a single pod
+- All traffic goes to a single worker
 
 Setup steps:
-- Configure each k8s worker machine with a static IP
-- Create a ClusterIP Service with an `externalIPs` set to the IP address of any k8s worker
-  - More than one `externalIP` is not supported by this controller
+- Configure a k8s worker machine with a static IP
+- Create a ClusterIP Service with an `externalIPs` set to the IP address of the k8s worker
 - Verify the controller has created a new port forwarding rule on your router
 
 Explanation:
@@ -76,12 +75,42 @@ the configured `externalIP` of a given Service, `kube-proxy` will forward traffi
 Service's pod.
 If there are multiple pod replicas, traffic will be load balanced between the pods,
 but all traffic will be initially received by a single worker node before being routed
-to the correct pod.
+to one of the pod replicas.
 This is due to port forwarding rules requiring a one-to-one mapping of port to IP address.
 
 #### Deploying the Controller
 
-TODO: mention helm chart
+##### With Helm
+
+- Deploy Helm/Tiller into your k8s cluster
+- Create a `./secrets/router.yml` file with the following fields (additional optional props [here](./chart/values.yml)):
+  ```
+  router:
+    url: $YOUR_ROUTER_URL
+    username: $YOUR_ROUTER_USERNAME
+    password: $YOUR_ROUTER_PASSWORD
+  ```
+- Run the following command to install or upgrade the controller:
+  ```
+  helm upgrade \
+    --install \
+    --values ./secrets/router.yml \
+    port-forwarding \
+    https://storage.googleapis.com/ansible-assets/port-forwarding-0.1.0.tgz
+  ```
+
+##### Without Helm
+
+- Create a `./secrets/router.env` file with the following contents:
+  ```
+  ROUTER_URL=$YOUR_ROUTER_URL
+  ROUTER_USERNAME=$YOUR_ROUTER_USERNAME
+  ROUTER_PASSWORD=$YOUR_ROUTER_PASSWORD
+  ```
+- Run the following command to install or upgrade the controller:
+  ```
+  make deploy
+  ```
 
 #### Additional options
 
@@ -90,7 +119,8 @@ Additional optional Annotations:
 
 #### Contributing
 
-TODO:
-- run tests
-- build/push docker image
-- mention kubebuilder
+- Run unit tests: `make test`
+- Try out controller in a local container: `make run`
+- Build docker images: `make docker-build`
+- Push docker images: `make docker-push`
+- Create a new controller class: `kubebuilder create api --group workloads --version v1beta1 --kind ContainerSet`
