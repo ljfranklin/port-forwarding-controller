@@ -33,6 +33,8 @@ manage forwarding rules for that Service.
 
 ##### LoadBalancer Service
 
+![alt text](https://docs.google.com/drawings/d/e/2PACX-1vQwGWEOlNjTK9lAuiDWBeQNGK_fLdYEndkjSbKnsX4JQeDxtVrTkLE-pi8ikS1uuoLZPV-RgzmZE-q2/pub?w=960&h=720 "LoadBalancer Service Diagram")
+
 Pros:
 - Traffic is balanced across multiple workers
 
@@ -51,9 +53,13 @@ Setup steps for MetalLB + Unifi router:
 Explanation:
 
 The MetalLB [Concepts page](https://metallb.universe.tf/concepts/bgp/) does a good job
-explaining the underlying BGP concepts and the limitations of it.
+explaining the underlying BGP (Border Gateway Protocol) concepts and the limitations of it.
+The short version is that BGP allows multiple machines to "share" a single IP address
+and the router will load balance requests across all machines which advertise that IP.
 
 ##### ClusterIP Service with ExternalIP
+
+![alt text](https://docs.google.com/drawings/d/e/2PACX-1vQFY9Mt1SMhAfm78ttS1V0pfl4cWk5rkPHmGx0XtrtRhhBjMil1VjlviQozIRTWHbT1vjEd_PcqGbdo/pub?w=960&h=720 "ExternalIP Service Diagram")
 
 Pros:
 - Minimal additional setup
